@@ -4,34 +4,53 @@ import { cn } from "./lib/utils";
 type Location = { x: number; y: number };
 
 function App() {
+  // ====================
+  // State
+  // ====================
   const [handleLoc, setHandleLoc] = useState<Location>({ x: 500, y: 155 });
-  const [qValue, setQValue] = useState<number>(20);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [qRotation, setQRotation] = useState<number>(60);
   const [qLastY, setQLastY] = useState<number>(0);
   const [activeKnob, setActiveKnob] = useState<string | null>(null);
 
-  function handleClick(e: React.MouseEvent<HTMLElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const graphX = (x / rect.width) * 800;
-    const graphY = (y / rect.height) * 480;
-    setHandleLoc({ x: graphX, y: graphY });
-  }
-
+  // ====================
+  // Constants (no dependencies)
+  // ====================
   const baselineY = 300;
-  const centerX = handleLoc.x;
-  const gainHeight = baselineY - handleLoc.y;
   const minQ = 0.025;
   const maxQ = 40;
-  const normalizedQ = (qValue - minQ) / (maxQ - minQ);
-  const inverted = 1 - normalizedQ;
   const minWidth = 8;
   const maxWidth = 100;
+  const minAngle = -135;
+  const maxAngle = 135;
+
+  // ====================
+  // Derived from state (rotation → Q)
+  // ====================
+  const normalizedRotation = (qRotation - minAngle) / (maxAngle - minAngle);
+
+  const mappedQ = minQ + normalizedRotation * (maxQ - minQ);
+
+  // ====================
+  // Derived from Q (Q → width)
+  // ====================
+  const normalizedQ = (mappedQ - minQ) / (maxQ - minQ);
+
+  const inverted = 1 - normalizedQ;
+
   const range = maxWidth - minWidth;
+
   const width = minWidth + inverted * range;
 
+  // ====================
+  // Curve inputs
+  // ====================
+  const centerX = handleLoc.x;
+  const gainHeight = baselineY - handleLoc.y;
+
+  // ====================
+  // Path generation
+  // ====================
   let path = `M 0 ${baselineY}`;
 
   for (let x = 0; x <= 800; x += 4) {
@@ -41,10 +60,17 @@ function App() {
     path += ` L ${x} ${y}`;
   }
 
-  // const minAngle = -135;
-  // const maxAngle = 135;
-  // const normalizedRotation = (qRotation - minAngle) / (maxAngle - minAngle);
-  // const mappedQ = minQ + normalizedRotation * (maxQ - minQ);
+  // ====================
+  // Handlers
+  // ====================
+  function handleClick(e: React.MouseEvent<HTMLElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const graphX = (x / rect.width) * 800;
+    const graphY = (y / rect.height) * 480;
+    setHandleLoc({ x: graphX, y: graphY });
+  }
 
   function handleKnobMouseDown(e: React.MouseEvent<HTMLElement>) {
     setIsDragging(true);
@@ -54,11 +80,7 @@ function App() {
   function handleMouseDrag(e: React.MouseEvent<HTMLElement>) {
     if (!isDragging) return;
 
-  const minAngle = -135;
-  const maxAngle = 135;
-
     if (activeKnob === "Q") {
-
       const sensitivity = 1;
       const currQY = e.clientY;
       const deltaY = currQY - qLastY;
@@ -69,9 +91,7 @@ function App() {
 
         return next;
       });
-      const normalizedRotation = (qRotation - minAngle) / (maxAngle - minAngle);
-      const mappedQ = minQ + normalizedRotation * (maxQ - minQ);
-      setQValue(mappedQ)
+
       setQLastY(currQY);
     }
   }
