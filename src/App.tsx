@@ -1,8 +1,87 @@
+import { useState } from "react";
 import { cn } from "./lib/utils";
 
+type Location = { x: number; y: number };
+
 function App() {
+  const [handleLoc, setHandleLoc] = useState<Location>({ x: 500, y: 155 });
+  const [qValue, setQValue] = useState<number>(20);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [qRotation, setQRotation] = useState<number>(60);
+  const [qLastY, setQLastY] = useState<number>(0);
+  const [activeKnob, setActiveKnob] = useState<string | null>(null);
+
+  function handleClick(e: React.MouseEvent<HTMLElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const graphX = (x / rect.width) * 800;
+    const graphY = (y / rect.height) * 480;
+    setHandleLoc({ x: graphX, y: graphY });
+  }
+
+  const baselineY = 300;
+  const centerX = handleLoc.x;
+  const gainHeight = baselineY - handleLoc.y;
+  const minQ = 0.025;
+  const maxQ = 40;
+  const normalizedQ = (qValue - minQ) / (maxQ - minQ);
+  const inverted = 1 - normalizedQ;
+  const minWidth = 8;
+  const maxWidth = 100;
+  const range = maxWidth - minWidth;
+  const width = minWidth + inverted * range;
+
+  let path = `M 0 ${baselineY}`;
+
+  for (let x = 0; x <= 800; x += 4) {
+    const dx = x - centerX;
+    const bell = Math.exp(-(dx * dx) / (2 * width * width));
+    const y = baselineY - gainHeight * bell;
+    path += ` L ${x} ${y}`;
+  }
+
+  // const minAngle = -135;
+  // const maxAngle = 135;
+  // const normalizedRotation = (qRotation - minAngle) / (maxAngle - minAngle);
+  // const mappedQ = minQ + normalizedRotation * (maxQ - minQ);
+
+  function handleKnobMouseDown(e: React.MouseEvent<HTMLElement>) {
+    setIsDragging(true);
+    setQLastY(e.clientY);
+  }
+
+  function handleMouseDrag(e: React.MouseEvent<HTMLElement>) {
+    if (!isDragging) return;
+
+  const minAngle = -135;
+  const maxAngle = 135;
+
+    if (activeKnob === "Q") {
+
+      const sensitivity = 1;
+      const currQY = e.clientY;
+      const deltaY = currQY - qLastY;
+      setQRotation((prev) => {
+        const next = prev - deltaY * sensitivity;
+        if (next > 135) return 135;
+        if (next < -135) return -135;
+
+        return next;
+      });
+      const normalizedRotation = (qRotation - minAngle) / (maxAngle - minAngle);
+      const mappedQ = minQ + normalizedRotation * (maxQ - minQ);
+      setQValue(mappedQ)
+      setQLastY(currQY);
+    }
+  }
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#111113]">
+    <div
+      className="min-h-screen w-full flex items-center justify-center bg-[#111113] select-none"
+      onMouseMove={(e) => isDragging && handleMouseDrag(e)}
+      onMouseUp={() => setIsDragging(false)}
+    >
       <div
         className={cn(
           "w-[70%] max-w-[800px] h-[600px]",
@@ -23,6 +102,7 @@ function App() {
             // Top-to-bottom gradient: slightly lifted top, darker toward the divider
             background: "linear-gradient(to bottom, #1f1f24 0%, #18181c 100%)",
           }}
+          onClick={handleClick}
         >
           {/* Horizontal dB lines — sparse, faint */}
           <div
@@ -88,30 +168,25 @@ function App() {
             </defs>
 
             {/* Bell curve — fill + stroke wrapped in fade mask */}
-            <g mask="url(#curveFade)">
-              <path
-                d="M 0 300 Q 200 300 320 290 Q 380 286 440 220 Q 480 170 500 155 Q 520 170 560 220 Q 600 270 660 288 Q 720 298 800 300 L 800 480 L 0 480 Z"
-                fill="url(#bandFill)"
-              />
-              <path
-                d="M 0 300 Q 200 300 320 290 Q 380 286 440 220 Q 480 170 500 155 Q 520 170 560 220 Q 600 270 660 288 Q 720 298 800 300"
-                fill="none"
-                stroke="#5b8cff"
-                strokeWidth="1.5"
-                strokeOpacity="0.85"
-              />
-            </g>
+            <path d={`${path} L 800 480 L 0 480 Z`} fill="url(#bandFill)" />
+            <path
+              d={path}
+              fill="none"
+              stroke="#5b8cff"
+              strokeWidth="1.5"
+              strokeOpacity="0.85"
+            />
 
             {/* Handle — the draggable-looking control point */}
             <circle
-              cx="500"
-              cy="155"
+              cx={handleLoc.x}
+              cy={handleLoc.y}
               r="6"
               fill="#7aa8ff"
               filter="url(#handleGlow)"
             />
             {/* Inner bright dot */}
-            <circle cx="500" cy="155" r="3" fill="#c8daff" />
+            <circle cx={handleLoc.x} cy={handleLoc.y} r="3" fill="#c8daff" />
           </svg>
         </div>
 
@@ -133,7 +208,7 @@ function App() {
               max: "30 kHz",
             },
             { label: "GAIN", size: 34, angle: 20, min: "-30", max: "+30" },
-            { label: "Q", size: 28, angle: 60, min: "0.025", max: "40" },
+            { label: "Q", size: 28, angle: qRotation, min: "0.025", max: "40" },
           ].map(({ label, size, angle, min, max }) => {
             const r = size;
             const cx = r + 6;
@@ -170,7 +245,14 @@ function App() {
             const maxLy = cy + labelR * Math.sin(toRad(maxDeg));
 
             return (
-              <div key={label} className="flex flex-col items-center gap-1.5">
+              <div
+                key={label}
+                className="flex flex-col items-center gap-1.5"
+                onMouseDown={(e) => {
+                  setActiveKnob(label);
+                  handleKnobMouseDown(e);
+                }}
+              >
                 <svg
                   width={svgSize}
                   height={svgSize}
