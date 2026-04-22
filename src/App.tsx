@@ -1,9 +1,29 @@
 import { useRef, useState } from "react";
-import { cn } from "./lib/utils";
+import {
+  cn,
+  freqToNormalized,
+  normalizedToFreq,
+  normalizedToX,
+  xToNormalized,
+} from "./lib/utils";
 import Controls from "./components/Controls";
 import type { BandNumber, Knob, Location } from "./types/Types";
-import { baselineY, minQ, maxQ, minGain, maxGain, minWidth, maxWidth, minAngle, maxAngle, maxBellHeight } from "./constants";
-
+import {
+  baselineY,
+  minQ,
+  maxQ,
+  minGain,
+  maxGain,
+  minWidth,
+  maxWidth,
+  minAngle,
+  maxAngle,
+  maxBellHeight,
+  graphMinX,
+  graphMaxX,
+  freqMarkers,
+  majorIndexes,
+} from "./constants";
 
 function App() {
   // ====================
@@ -14,11 +34,18 @@ function App() {
   const [isKnobDragging, setIsKnobDragging] = useState<boolean>(false);
   const [qRotation, setQRotation] = useState<number>(60);
   const [gainValue, setGainValue] = useState<number>(0);
-  const [freqRotation, setFreqRotation] = useState<number>(40);
+  const [freqValue, setFreqValue] = useState<number>(1000);
+  const [freqRotation, setFreqRotation] = useState(0);
   const [lastMouseY, setLastMouseY] = useState<number>(0);
   const [activeKnob, setActiveKnob] = useState<Knob>(null);
+  const [isFreqKnobHovered, setIsFreqKnobHovered] = useState<boolean>(false);
+  const [isHandleHovered, setIsHandleHovered] = useState<boolean>(false);
   const [bandSelected, setBandSelected] = useState<BandNumber>(null);
   const graphPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const markerPositions = freqMarkers.map((freq) =>
+    normalizedToX(freqToNormalized(freq), graphMinX, graphMaxX),
+  );
 
 
   // ====================
@@ -27,6 +54,10 @@ function App() {
   const normalizedRotation: number =
     (qRotation - minAngle) / (maxAngle - minAngle);
   const mappedQ: number = minQ + normalizedRotation * (maxQ - minQ);
+
+  const normalizedFreq = freqToNormalized(freqValue);
+  const freqKnobRotation = minAngle + normalizedFreq * (maxAngle - minAngle);
+  const handleX = normalizedToX(normalizedFreq, graphMinX, graphMaxX);
 
   // ====================
   // Derived from Q (Q → width)
@@ -39,16 +70,28 @@ function App() {
   // ====================
   // Derived from G (Gain → height)
   // ====================
-  const signedGain = gainValue / maxGain
-const gainHeightFromKnob = signedGain * maxBellHeight
-const handleYFromGain = baselineY - gainHeightFromKnob
-const gainRotation = gainValue * 4.5
+  const signedGain = gainValue / maxGain;
+  const gainHeightFromKnob = signedGain * maxBellHeight;
+  const handleYFromGain = baselineY - gainHeightFromKnob;
+  const freqLabel = `${Math.round(freqValue)} Hz`;
+  const freqLabelWidth = Math.max(52, freqLabel.length * 6.8 + 12);
+  const freqLabelX = Math.max(
+    4,
+    Math.min(800 - freqLabelWidth - 4, handleX - freqLabelWidth / 2),
+  );
+  const freqLabelY = handleYFromGain - 28;
+  const showFreqLabel =
+    isHandleDragging ||
+    isHandleHovered ||
+    isFreqKnobHovered ||
+    (isKnobDragging && activeKnob === "FREQ");
+  const gainRotation = gainValue * 4.5;
+  const gainHeight: number = gainHeightFromKnob;
 
   // ====================
   // Curve inputs
   // ====================
-  const centerX: number = handleLoc.x;
-  const gainHeight: number = gainHeightFromKnob;
+  // ***** const centerX: number = handleX ****** (delete?)
 
   // ====================
   // Path generation
@@ -56,7 +99,7 @@ const gainRotation = gainValue * 4.5
   let path: string = `M 0 ${baselineY}`;
 
   for (let x = 0; x <= 800; x += 4) {
-    const dx: number = x - centerX;
+    const dx: number = x - handleX;
     const bell: number = Math.exp(-(dx * dx) / (2 * width * width));
     const y: number = baselineY - gainHeight * bell;
     path += ` L ${x} ${y}`;
@@ -74,7 +117,7 @@ const gainRotation = gainValue * 4.5
   function handleKnobDrag(e: React.MouseEvent<HTMLElement, MouseEvent>): void {
     if (!isKnobDragging) return;
     if (bandSelected === null) return;
-    
+
     const currY = e.clientY;
     const deltaY = currY - lastMouseY;
 
@@ -102,18 +145,20 @@ const gainRotation = gainValue * 4.5
       setLastMouseY(currY);
     }
 
-    // if (activeKnob === "FREQ") {
-    //   setFreqRotation((prev) => {
-    //     const next = prev - deltaY * sensitivity;
-    //     if (next > 135) return 135;
-    //     if (next < -135) return -135;
+    if (activeKnob === "FREQ") {
+      setFreqRotation((prev) => {
+        const next = Math.max(minAngle, Math.min(maxAngle, prev - deltaY));
 
-    //     return next;
-    //   });
-    //   setLastMouseY(currY);
-    // }
+        const normalized = (next - minAngle) / (maxAngle - minAngle);
+        const newFreq = normalizedToFreq(normalized);
+
+        setFreqValue(newFreq);
+
+        return next;
+      });
+      setLastMouseY(currY);
+    }
   }
-
 
   function handleBandSelect(band: BandNumber): void {
     if (band === bandSelected) return;
@@ -136,18 +181,19 @@ const gainRotation = gainValue * 4.5
     const graphY = (localY / rect.height) * 480;
 
     // Keep handle within graph bounds
-    const clampedX = Math.max(0, Math.min(800, graphX));
     const clampedY = Math.max(0, Math.min(480, graphY));
+    const clampedX = Math.max(0, Math.min(800, graphX));
+    const normalized = xToNormalized(clampedX, graphMinX, graphMaxX);
+    const newFreqValue = normalizedToFreq(normalized);
+    setFreqValue(newFreqValue);
 
-    const distance = baselineY - clampedY
-    const newGainValue = distance * (1/6)
+    const distance = baselineY - clampedY;
+    const newGainValue = distance * (1 / 6);
     setGainValue(() => {
       if (newGainValue > maxGain) return maxGain;
-      if (newGainValue < minGain) return minGain; 
+      if (newGainValue < minGain) return minGain;
       return newGainValue;
-    })
-  
-    setHandleLoc((prev) => ({ x: clampedX, y: prev.y }));
+    });
   }
 
   return (
@@ -195,14 +241,15 @@ const gainRotation = gainValue * 4.5
             }}
           />
           {/* Vertical frequency lines — denser, slightly more prominent */}
-          <div
+
+          {/* <div
             className="absolute inset-0 pointer-events-none"
             style={{
               backgroundImage:
                 "linear-gradient(90deg, rgba(255,255,255,0.052) 1px, transparent 1px)",
               backgroundSize: "40px 100%",
             }}
-          />
+          /> */}
 
           {/* EQ band — visual only */}
           <svg
@@ -211,6 +258,20 @@ const gainRotation = gainValue * 4.5
             preserveAspectRatio="none"
             viewBox="0 0 800 480"
           >
+            {markerPositions.map((x, i) => {
+                const isMajor = majorIndexes.includes(i);
+                return (
+              <line
+                key={i}
+                x1={x}
+                x2={x}
+                y1={0}
+                y2={480} 
+                stroke="white"
+                strokeOpacity={isMajor ? 0.15 : 0.08}
+                strokeWidth={1}
+              />)
+            })}
             <defs>
               {/* Bell fill */}
               <linearGradient id="bandFill" x1="0" y1="0" x2="0" y2="1">
@@ -246,15 +307,48 @@ const gainRotation = gainValue * 4.5
               strokeOpacity="0.85"
             />
 
+            <g
+              pointerEvents="none"
+              className={cn(
+                "transition-opacity duration-150",
+                showFreqLabel ? "opacity-100" : "opacity-0",
+              )}
+            >
+              <rect
+                x={freqLabelX}
+                y={freqLabelY}
+                width={freqLabelWidth}
+                height={16}
+                rx={3}
+                fill="rgba(18,18,22,0.78)"
+                stroke="rgba(255,255,255,0.15)"
+                strokeWidth={0.7}
+              />
+              <text
+                x={freqLabelX + freqLabelWidth / 2}
+                y={freqLabelY + 8}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize="12"
+                fill="rgba(255,255,255,0.50)"
+                fontFamily="ui-monospace, monospace"
+                letterSpacing="0.02em"
+              >
+                {freqLabel}
+              </text>
+            </g>
+
             {/* Handle — the draggable-looking control point */}
             <g
               style={{
-                transformOrigin: `${handleLoc.x}px ${handleYFromGain}px`,
+                transformOrigin: `${handleX}px ${handleYFromGain}px`,
                 transition: "transform 0.15s ease",
                 cursor: "pointer",
               }}
-              className="hover:scale-120"
+              className="group hover:scale-120"
               pointerEvents="all"
+              onMouseEnter={() => setIsHandleHovered(true)}
+              onMouseLeave={() => setIsHandleHovered(false)}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 handleBandSelect(1);
@@ -266,14 +360,14 @@ const gainRotation = gainValue * 4.5
               }}
             >
               <circle
-                cx={handleLoc.x}
+                cx={handleX}
                 cy={handleYFromGain}
                 r="6"
                 fill="#7aa8ff"
                 filter="url(#handleGlow)"
               />
               {/* Inner bright dot */}
-              <circle cx={handleLoc.x} cy={handleYFromGain} r="3" fill="#c8daff" />
+              <circle cx={handleX} cy={handleYFromGain} r="3" fill="#c8daff" />
             </g>
           </svg>
         </div>
@@ -289,9 +383,12 @@ const gainRotation = gainValue * 4.5
           <Controls
             qRotation={qRotation}
             gainRotation={gainRotation}
-            freqRotation={freqRotation}
+            freqKnobRotation={freqKnobRotation}
+            setFreqRotation={setFreqRotation}
+            freqValue={freqValue}
             bandSelected={bandSelected}
             setActiveKnob={setActiveKnob}
+            setIsFreqKnobHovered={setIsFreqKnobHovered}
             handleKnobMouseDown={handleKnobMouseDown}
           />
         </div>

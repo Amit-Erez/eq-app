@@ -1,26 +1,33 @@
+import { maxAngle, minAngle } from "../constants";
+import { freqToNormalized } from "../lib/utils";
 import type { BandNumber, Knob, KnobsSpecs } from "../types/Types";
-
 
 function Controls({
   qRotation,
   gainRotation,
-  freqRotation,
+  freqKnobRotation,
+  setFreqRotation,
+  freqValue,
   bandSelected,
   setActiveKnob,
+  setIsFreqKnobHovered,
   handleKnobMouseDown,
 }: {
   qRotation: number;
   gainRotation: number;
-  freqRotation: number;
+  freqKnobRotation: number;
   bandSelected: BandNumber;
   setActiveKnob: (label: Knob) => void;
+  setIsFreqKnobHovered: (isHovered: boolean) => void;
   handleKnobMouseDown: (e: React.MouseEvent<HTMLElement, MouseEvent>) => void;
+  setFreqRotation: (rotation: number) => void;
+  freqValue: number;
 }) {
   const knobs: KnobsSpecs[] = [
     {
       label: "FREQ",
       size: 28,
-      angle: bandSelected ? freqRotation : 0,
+      angle: bandSelected ? freqKnobRotation : 0,
       min: "10 Hz",
       max: "30 kHz",
     },
@@ -81,8 +88,20 @@ function Controls({
           <div
             key={label}
             className="flex flex-col items-center gap-1.5"
+            onMouseEnter={() => {
+              if (label === "FREQ") setIsFreqKnobHovered(true);
+            }}
+            onMouseLeave={() => {
+              if (label === "FREQ") setIsFreqKnobHovered(false);
+            }}
             onMouseDown={(e) => {
               setActiveKnob(label);
+              if (label === "FREQ") {
+                setFreqRotation(
+                  minAngle +
+                    freqToNormalized(freqValue) * (maxAngle - minAngle),
+                );
+              }
               handleKnobMouseDown(e);
             }}
           >

@@ -15,3 +15,13 @@
   // Knob
   export const minAngle = -135;
   export const maxAngle = 135;
+
+  // FREQ 
+  export const graphMinX = 0;
+  export const graphMaxX = 800;
+
+  export const freqMarkers = [
+    10, 20, 40, 80, 160, 300, 400, 500, 650, 1000, 2500, 5000, 8000, 10000, 20000,
+  ]
+
+  export const majorIndexes = [2, 4, 8, 10, 11, 13];
