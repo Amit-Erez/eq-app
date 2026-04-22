@@ -1,110 +1,170 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "./lib/utils";
+import Controls from "./components/Controls";
+import type { BandNumber, Knob, Location } from "./types/Types";
+import { baselineY, minQ, maxQ, minGain, maxGain, minWidth, maxWidth, minAngle, maxAngle, maxBellHeight } from "./constants";
 
-type Location = { x: number; y: number };
 
 function App() {
   // ====================
   // State
   // ====================
   const [handleLoc, setHandleLoc] = useState<Location>({ x: 500, y: 155 });
-  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isHandleDragging, setIsHandleDragging] = useState<boolean>(false);
+  const [isKnobDragging, setIsKnobDragging] = useState<boolean>(false);
   const [qRotation, setQRotation] = useState<number>(60);
-  const [qLastY, setQLastY] = useState<number>(0);
-  const [activeKnob, setActiveKnob] = useState<string | null>(null);
+  const [gainValue, setGainValue] = useState<number>(0);
+  const [freqRotation, setFreqRotation] = useState<number>(40);
+  const [lastMouseY, setLastMouseY] = useState<number>(0);
+  const [activeKnob, setActiveKnob] = useState<Knob>(null);
+  const [bandSelected, setBandSelected] = useState<BandNumber>(null);
+  const graphPanelRef = useRef<HTMLDivElement | null>(null);
+
 
   // ====================
-  // Constants (no dependencies)
+  // Derived from state (rotation → Q / Gain / Freq)
   // ====================
-  const baselineY = 300;
-  const minQ = 0.025;
-  const maxQ = 40;
-  const minWidth = 8;
-  const maxWidth = 100;
-  const minAngle = -135;
-  const maxAngle = 135;
-
-  // ====================
-  // Derived from state (rotation → Q)
-  // ====================
-  const normalizedRotation = (qRotation - minAngle) / (maxAngle - minAngle);
-
-  const mappedQ = minQ + normalizedRotation * (maxQ - minQ);
+  const normalizedRotation: number =
+    (qRotation - minAngle) / (maxAngle - minAngle);
+  const mappedQ: number = minQ + normalizedRotation * (maxQ - minQ);
 
   // ====================
   // Derived from Q (Q → width)
   // ====================
-  const normalizedQ = (mappedQ - minQ) / (maxQ - minQ);
+  const normalizedQ: number = (mappedQ - minQ) / (maxQ - minQ);
+  const inverted: number = 1 - normalizedQ;
+  const qRange: number = maxWidth - minWidth;
+  const width: number = minWidth + inverted * qRange;
 
-  const inverted = 1 - normalizedQ;
-
-  const range = maxWidth - minWidth;
-
-  const width = minWidth + inverted * range;
+  // ====================
+  // Derived from G (Gain → height)
+  // ====================
+  const signedGain = gainValue / maxGain
+const gainHeightFromKnob = signedGain * maxBellHeight
+const handleYFromGain = baselineY - gainHeightFromKnob
+const gainRotation = gainValue * 4.5
 
   // ====================
   // Curve inputs
   // ====================
-  const centerX = handleLoc.x;
-  const gainHeight = baselineY - handleLoc.y;
+  const centerX: number = handleLoc.x;
+  const gainHeight: number = gainHeightFromKnob;
 
   // ====================
   // Path generation
   // ====================
-  let path = `M 0 ${baselineY}`;
+  let path: string = `M 0 ${baselineY}`;
 
   for (let x = 0; x <= 800; x += 4) {
-    const dx = x - centerX;
-    const bell = Math.exp(-(dx * dx) / (2 * width * width));
-    const y = baselineY - gainHeight * bell;
+    const dx: number = x - centerX;
+    const bell: number = Math.exp(-(dx * dx) / (2 * width * width));
+    const y: number = baselineY - gainHeight * bell;
     path += ` L ${x} ${y}`;
   }
 
   // ====================
   // Handlers
   // ====================
-  function handleClick(e: React.MouseEvent<HTMLElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const graphX = (x / rect.width) * 800;
-    const graphY = (y / rect.height) * 480;
-    setHandleLoc({ x: graphX, y: graphY });
+
+  function handleKnobMouseDown(e: React.MouseEvent<HTMLElement>): void {
+    setIsKnobDragging(true);
+    setLastMouseY(e.clientY);
   }
 
-  function handleKnobMouseDown(e: React.MouseEvent<HTMLElement>) {
-    setIsDragging(true);
-    setQLastY(e.clientY);
-  }
-
-  function handleMouseDrag(e: React.MouseEvent<HTMLElement>) {
-    if (!isDragging) return;
+  function handleKnobDrag(e: React.MouseEvent<HTMLElement, MouseEvent>): void {
+    if (!isKnobDragging) return;
+    if (bandSelected === null) return;
+    
+    const currY = e.clientY;
+    const deltaY = currY - lastMouseY;
 
     if (activeKnob === "Q") {
-      const sensitivity = 1;
-      const currQY = e.clientY;
-      const deltaY = currQY - qLastY;
+      const sensitivity = 1.5;
       setQRotation((prev) => {
         const next = prev - deltaY * sensitivity;
-        if (next > 135) return 135;
-        if (next < -135) return -135;
+        if (next > maxAngle) return maxAngle;
+        if (next < minAngle) return minAngle;
 
         return next;
       });
-
-      setQLastY(currQY);
+      setLastMouseY(currY);
     }
+
+    if (activeKnob === "GAIN") {
+      const sensitivity = 0.25;
+      setGainValue((prev) => {
+        const next = prev - deltaY * sensitivity;
+        if (next > maxGain) return maxGain;
+        if (next < minGain) return minGain;
+
+        return next;
+      });
+      setLastMouseY(currY);
+    }
+
+    // if (activeKnob === "FREQ") {
+    //   setFreqRotation((prev) => {
+    //     const next = prev - deltaY * sensitivity;
+    //     if (next > 135) return 135;
+    //     if (next < -135) return -135;
+
+    //     return next;
+    //   });
+    //   setLastMouseY(currY);
+    // }
+  }
+
+
+  function handleBandSelect(band: BandNumber): void {
+    if (band === bandSelected) return;
+    setBandSelected((prev) => (prev === band ? null : band));
+    console.log("Selected band:", band);
+  }
+
+  function handleHandleDrag(
+    e: React.MouseEvent<HTMLElement, MouseEvent>,
+  ): void {
+    if (!isHandleDragging) return;
+    if (!graphPanelRef.current) return;
+
+    const rect = graphPanelRef.current.getBoundingClientRect();
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+
+    // Map panel-local mouse coords to SVG graph space (800 x 480)
+    const graphX = (localX / rect.width) * 800;
+    const graphY = (localY / rect.height) * 480;
+
+    // Keep handle within graph bounds
+    const clampedX = Math.max(0, Math.min(800, graphX));
+    const clampedY = Math.max(0, Math.min(480, graphY));
+
+    const distance = baselineY - clampedY
+    const newGainValue = distance * (1/6)
+    setGainValue(() => {
+      if (newGainValue > maxGain) return maxGain;
+      if (newGainValue < minGain) return minGain; 
+      return newGainValue;
+    })
+  
+    setHandleLoc((prev) => ({ x: clampedX, y: prev.y }));
   }
 
   return (
     <div
       className="min-h-screen w-full flex items-center justify-center bg-[#111113] select-none"
-      onMouseMove={(e) => isDragging && handleMouseDrag(e)}
-      onMouseUp={() => setIsDragging(false)}
+      onMouseMove={(e) => {
+        if (isKnobDragging) handleKnobDrag(e);
+        if (isHandleDragging) handleHandleDrag(e);
+      }}
+      onMouseUp={() => {
+        setIsKnobDragging(false);
+        setIsHandleDragging(false);
+      }}
     >
       <div
         className={cn(
-          "w-[70%] max-w-[800px] h-[600px]",
+          "w-[70%] max-w-200 h-150",
           "flex flex-col",
           "rounded-xl",
           // Outer border + inset highlight ring for a layered surface feel
@@ -117,12 +177,13 @@ function App() {
       >
         {/* Top row — EQ display area */}
         <div
-          className="flex-[3] relative overflow-hidden"
+          ref={graphPanelRef}
+          className="flex-3 relative overflow-hidden"
           style={{
             // Top-to-bottom gradient: slightly lifted top, darker toward the divider
             background: "linear-gradient(to bottom, #1f1f24 0%, #18181c 100%)",
           }}
-          onClick={handleClick}
+          onMouseDown={() => handleBandSelect(null)}
         >
           {/* Horizontal dB lines — sparse, faint */}
           <div
@@ -145,32 +206,16 @@ function App() {
 
           {/* EQ band — visual only */}
           <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
+            className="absolute inset-0 w-full h-full"
+            style={{ pointerEvents: "none" }}
             preserveAspectRatio="none"
             viewBox="0 0 800 480"
           >
             <defs>
-              {/* Vertical fill gradient (top opacity → transparent at bottom) */}
+              {/* Bell fill */}
               <linearGradient id="bandFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#5b8cff" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#5b8cff" stopOpacity="0.0" />
+                <stop offset="100%" stopColor="#5b8cff" stopOpacity="0.34" />
               </linearGradient>
-              {/* Horizontal fade mask — full opacity in center, fades to 0 on both edges */}
-              <linearGradient id="fadeMask" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="white" stopOpacity="0" />
-                <stop offset="20%" stopColor="white" stopOpacity="1" />
-                <stop offset="80%" stopColor="white" stopOpacity="1" />
-                <stop offset="100%" stopColor="white" stopOpacity="0" />
-              </linearGradient>
-              <mask id="curveFade">
-                <rect
-                  x="0"
-                  y="0"
-                  width="800"
-                  height="480"
-                  fill="url(#fadeMask)"
-                />
-              </mask>
               {/* Glow filter for the handle */}
               <filter
                 id="handleGlow"
@@ -188,7 +233,11 @@ function App() {
             </defs>
 
             {/* Bell curve — fill + stroke wrapped in fade mask */}
-            <path d={`${path} L 800 480 L 0 480 Z`} fill="url(#bandFill)" />
+            <path
+              d={`${path} L 800 ${baselineY} L 0 ${baselineY} Z`}
+              fill="url(#bandFill)"
+              className={bandSelected === 1 ? "opacity-100" : "opacity-60"}
+            />
             <path
               d={path}
               fill="none"
@@ -198,15 +247,34 @@ function App() {
             />
 
             {/* Handle — the draggable-looking control point */}
-            <circle
-              cx={handleLoc.x}
-              cy={handleLoc.y}
-              r="6"
-              fill="#7aa8ff"
-              filter="url(#handleGlow)"
-            />
-            {/* Inner bright dot */}
-            <circle cx={handleLoc.x} cy={handleLoc.y} r="3" fill="#c8daff" />
+            <g
+              style={{
+                transformOrigin: `${handleLoc.x}px ${handleYFromGain}px`,
+                transition: "transform 0.15s ease",
+                cursor: "pointer",
+              }}
+              className="hover:scale-120"
+              pointerEvents="all"
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                handleBandSelect(1);
+                setIsHandleDragging(true);
+              }}
+              onMouseUp={(e) => {
+                e.stopPropagation();
+                setIsHandleDragging(false);
+              }}
+            >
+              <circle
+                cx={handleLoc.x}
+                cy={handleYFromGain}
+                r="6"
+                fill="#7aa8ff"
+                filter="url(#handleGlow)"
+              />
+              {/* Inner bright dot */}
+              <circle cx={handleLoc.x} cy={handleYFromGain} r="3" fill="#c8daff" />
+            </g>
           </svg>
         </div>
 
@@ -217,200 +285,15 @@ function App() {
         </div>
 
         {/* Bottom control strip — 20% height, slightly darker/sunken */}
-        <div className="flex-[1] bg-[#141417] flex items-center justify-center gap-20">
-          {/* Knob component — inline, visual only */}
-          {[
-            {
-              label: "FREQ",
-              size: 28,
-              angle: -40,
-              min: "10 Hz",
-              max: "30 kHz",
-            },
-            { label: "GAIN", size: 34, angle: 20, min: "-30", max: "+30" },
-            { label: "Q", size: 28, angle: qRotation, min: "0.025", max: "40" },
-          ].map(({ label, size, angle, min, max }) => {
-            const r = size;
-            const cx = r + 6;
-            const cy = r + 6;
-            const svgSize = (r + 6) * 2;
-
-            // Indicator line
-            const rad = ((angle - 90) * Math.PI) / 180;
-            const lineInner = r * 0.38;
-            const lineOuter = r * 0.78;
-            const x1 = cx + Math.cos(rad) * lineInner;
-            const y1 = cy + Math.sin(rad) * lineInner;
-            const x2 = cx + Math.cos(rad) * lineOuter;
-            const y2 = cy + Math.sin(rad) * lineOuter;
-
-            // Arc: min = -135° (7 o'clock), max = 135° (5 o'clock)
-            const minDeg = -135;
-            const maxDeg = 135;
-            const arcR = r + 3.5;
-            const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
-            const asx = cx + arcR * Math.cos(toRad(minDeg));
-            const asy = cy + arcR * Math.sin(toRad(minDeg));
-            const aex = cx + arcR * Math.cos(toRad(angle));
-            const aey = cy + arcR * Math.sin(toRad(angle));
-            const tex = cx + arcR * Math.cos(toRad(maxDeg));
-            const tey = cy + arcR * Math.sin(toRad(maxDeg));
-            const fillLarge = angle - minDeg > 180 ? 1 : 0;
-
-            // Min/max label positions — just outside the arc
-            const labelR = arcR + 7;
-            const minLx = cx + labelR * Math.cos(toRad(minDeg));
-            const minLy = cy + labelR * Math.sin(toRad(minDeg));
-            const maxLx = cx + labelR * Math.cos(toRad(maxDeg));
-            const maxLy = cy + labelR * Math.sin(toRad(maxDeg));
-
-            return (
-              <div
-                key={label}
-                className="flex flex-col items-center gap-1.5"
-                onMouseDown={(e) => {
-                  setActiveKnob(label);
-                  handleKnobMouseDown(e);
-                }}
-              >
-                <svg
-                  width={svgSize}
-                  height={svgSize}
-                  viewBox={`0 0 ${svgSize} ${svgSize}`}
-                  style={{ overflow: "visible" }}
-                >
-                  <defs>
-                    <radialGradient
-                      id={`knobGrad-${label}`}
-                      cx="40%"
-                      cy="35%"
-                      r="65%"
-                    >
-                      <stop offset="0%" stopColor="#2e2e35" />
-                      <stop offset="100%" stopColor="#19191d" />
-                    </radialGradient>
-                    <filter
-                      id={`knobGlow-${label}`}
-                      x="-60%"
-                      y="-60%"
-                      width="220%"
-                      height="220%"
-                    >
-                      <feGaussianBlur stdDeviation={r * 0.45} result="blur" />
-                      <feComposite
-                        in="blur"
-                        in2="SourceGraphic"
-                        operator="over"
-                      />
-                    </filter>
-                    <filter
-                      id={`arcBlur-${label}`}
-                      x="-30%"
-                      y="-30%"
-                      width="160%"
-                      height="160%"
-                    >
-                      <feGaussianBlur stdDeviation="1" />
-                    </filter>
-                  </defs>
-
-                  {/* Soft aura */}
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={r}
-                    fill="#5b8cff"
-                    opacity="0.07"
-                    filter={`url(#knobGlow-${label})`}
-                  />
-                  {/* Knob base */}
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={r}
-                    fill={`url(#knobGrad-${label})`}
-                    stroke="#0d0d10"
-                    strokeWidth="1"
-                  />
-                  {/* Inner rim highlight */}
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={r - 1}
-                    fill="none"
-                    stroke="rgba(255,255,255,0.06)"
-                    strokeWidth="1"
-                  />
-                  {/* Indicator line */}
-                  <line
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    stroke="#7aa8ff"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    opacity="0.75"
-                  />
-                  {/* Track arc — full range, very faint */}
-                  <path
-                    d={`M ${asx} ${asy} A ${arcR} ${arcR} 0 1 1 ${tex} ${tey}`}
-                    fill="none"
-                    stroke="#3a5fcc"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    opacity="0.10"
-                  />
-                  {/* Fill arc — min to current angle */}
-                  <path
-                    d={`M ${asx} ${asy} A ${arcR} ${arcR} 0 ${fillLarge} 1 ${aex} ${aey}`}
-                    fill="none"
-                    stroke="#7aa8ff"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    opacity="0.35"
-                    filter={`url(#arcBlur-${label})`}
-                  />
-                  {/* Min label — 7 o'clock */}
-                  <text
-                    x={minLx}
-                    y={minLy}
-                    textAnchor="end"
-                    dominantBaseline="middle"
-                    fontSize="10"
-                    fill="rgba(255,255,255,0.22)"
-                    fontFamily="ui-monospace, monospace"
-                    letterSpacing="0.02em"
-                  >
-                    {min}
-                  </text>
-                  {/* Max label — 5 o'clock */}
-                  <text
-                    x={maxLx}
-                    y={maxLy}
-                    textAnchor="start"
-                    dominantBaseline="middle"
-                    fontSize="10"
-                    fill="rgba(255,255,255,0.22)"
-                    fontFamily="ui-monospace, monospace"
-                    letterSpacing="0.02em"
-                  >
-                    {max}
-                  </text>
-                </svg>
-
-                <span
-                  className="text-[10.5px] tracking-widest font-medium"
-                  style={{
-                    color: "rgba(255,255,255,0.40)",
-                    letterSpacing: "0.18em",
-                  }}
-                >
-                  {label}
-                </span>
-              </div>
-            );
-          })}
+        <div className="flex-1 bg-[#141417] flex items-center justify-center gap-20">
+          <Controls
+            qRotation={qRotation}
+            gainRotation={gainRotation}
+            freqRotation={freqRotation}
+            bandSelected={bandSelected}
+            setActiveKnob={setActiveKnob}
+            handleKnobMouseDown={handleKnobMouseDown}
+          />
         </div>
       </div>
     </div>
