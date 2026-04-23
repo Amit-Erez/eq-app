@@ -17,6 +17,8 @@
   export const maxAngle = 135;
 
   // FREQ 
+  export const MIN_FREQ = 10;
+  export const MAX_FREQ = 30000;
   export const graphMinX = 0;
   export const graphMaxX = 800;
 

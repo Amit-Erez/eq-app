@@ -1,28 +1,56 @@
-import { maxAngle, minAngle } from "../constants";
+import { useRef, useState } from "react";
+import {
+  MAX_FREQ,
+  maxAngle,
+  maxGain,
+  MIN_FREQ,
+  minAngle,
+  minGain,
+} from "../constants";
 import { freqToNormalized } from "../lib/utils";
 import type { BandNumber, Knob, KnobsSpecs } from "../types/Types";
 
 function Controls({
+  activeKnob,
   qRotation,
   gainRotation,
   freqKnobRotation,
-  setFreqRotation,
   freqValue,
   bandSelected,
+  knobDblClicked,
+  setKnobDblClicked,
+  setFreqValue,
+  setGainValue,
+  setFreqRotation,
   setActiveKnob,
   setIsFreqKnobHovered,
+  setIsGainKnobHovered,
   handleKnobMouseDown,
 }: {
+  activeKnob: Knob;
   qRotation: number;
   gainRotation: number;
   freqKnobRotation: number;
+  freqValue: number;
   bandSelected: BandNumber;
+  knobDblClicked: "FREQ" | "GAIN" | null;
+  setKnobDblClicked: (label: "FREQ" | "GAIN" | null) => void;
+  setFreqValue: (value: number) => void;
+  setGainValue: (value: number) => void;
+  setFreqRotation: (rotation: number) => void;
   setActiveKnob: (label: Knob) => void;
   setIsFreqKnobHovered: (isHovered: boolean) => void;
+  setIsGainKnobHovered: (isHovered: boolean) => void;
   handleKnobMouseDown: (e: React.MouseEvent<HTMLElement, MouseEvent>) => void;
-  setFreqRotation: (rotation: number) => void;
-  freqValue: number;
 }) {
+  const knobRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  // const [knobDblClicked, setKnobDblClicked] = useState<"FREQ" | "GAIN" | null>(
+  //   null,
+  // );
+  const [freqInputValue, setFreqInputValue] = useState<string>("");
+  const [gainInputValue, setGainInputValue] = useState<string>("");
+
   const knobs: KnobsSpecs[] = [
     {
       label: "FREQ",
@@ -46,6 +74,47 @@ function Controls({
       max: "40",
     },
   ];
+
+  function handleDoubleClick(
+    label: Knob,
+  ) {
+    if (!bandSelected) return;
+    if (label === "Q") return;
+  
+    setKnobDblClicked(label);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 0);
+    setActiveKnob(label);
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (knobDblClicked === "FREQ") {
+      setFreqInputValue(e.target.value);
+    } else if (knobDblClicked === "GAIN") {
+      setGainInputValue(e.target.value);
+    }
+  }
+
+  function handleInputKeyUp(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    const parsed = Number(e.currentTarget.value);
+    if (Number.isNaN(parsed)) return;
+
+    if (knobDblClicked === "FREQ") {
+      const clamped = Math.max(MIN_FREQ, Math.min(MAX_FREQ, parsed));
+      setFreqValue(clamped);
+      setFreqInputValue(clamped.toString())
+      return;
+    }
+
+    if (knobDblClicked === "GAIN") {
+      const clamped = Math.max(minGain, Math.min(maxGain, parsed));
+      setGainValue(clamped);
+      setGainInputValue(clamped.toString())
+      return;
+    }
+  }
 
   return (
     <>
@@ -86,13 +155,16 @@ function Controls({
 
         return (
           <div
+            ref={label === knobDblClicked ? knobRef : null}
             key={label}
-            className="flex flex-col items-center gap-1.5"
+            className="relative flex flex-col items-center gap-1.5"
             onMouseEnter={() => {
               if (label === "FREQ") setIsFreqKnobHovered(true);
+              if (label === "GAIN") setIsGainKnobHovered(true);
             }}
             onMouseLeave={() => {
               if (label === "FREQ") setIsFreqKnobHovered(false);
+              if (label === "GAIN") setIsGainKnobHovered(false);
             }}
             onMouseDown={(e) => {
               setActiveKnob(label);
@@ -104,7 +176,20 @@ function Controls({
               }
               handleKnobMouseDown(e);
             }}
+            onDoubleClick={() => handleDoubleClick(label)}
           >
+            {label === knobDblClicked && bandSelected ? (
+              <input
+                ref={inputRef}
+                type="text"
+                inputMode={label === "FREQ" ? "numeric" : "decimal"}
+                value={label === "FREQ" ? freqInputValue : gainInputValue}
+                onChange={handleInputChange}
+                onKeyUp={handleInputKeyUp}
+                maxLength={label === "FREQ" ? 5 : 4}
+                className="absolute bottom-full mb-1 left-1/2 z-10 w-14 -translate-x-1/2 rounded bg-black px-1 text-center text-[10px] text-gray-400 outline-none"
+              />
+            ) : null}
             <svg
               width={svgSize}
               height={svgSize}

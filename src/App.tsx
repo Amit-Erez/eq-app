@@ -24,12 +24,14 @@ import {
   freqMarkers,
   majorIndexes,
 } from "./constants";
+import { ValueLabel } from "./components/ValueLabel";
 
 function App() {
   // ====================
   // State
   // ====================
-  const [handleLoc, setHandleLoc] = useState<Location>({ x: 500, y: 155 });
+  const graphPanelRef = useRef<HTMLDivElement | null>(null);
+  // const [handleLoc, setHandleLoc] = useState<Location>({ x: 500, y: 155 });
   const [isHandleDragging, setIsHandleDragging] = useState<boolean>(false);
   const [isKnobDragging, setIsKnobDragging] = useState<boolean>(false);
   const [qRotation, setQRotation] = useState<number>(60);
@@ -39,14 +41,16 @@ function App() {
   const [lastMouseY, setLastMouseY] = useState<number>(0);
   const [activeKnob, setActiveKnob] = useState<Knob>(null);
   const [isFreqKnobHovered, setIsFreqKnobHovered] = useState<boolean>(false);
+  const [isGainKnobHovered, setIsGainKnobHovered] = useState<boolean>(false);
   const [isHandleHovered, setIsHandleHovered] = useState<boolean>(false);
   const [bandSelected, setBandSelected] = useState<BandNumber>(null);
-  const graphPanelRef = useRef<HTMLDivElement | null>(null);
+  const [knobDblClicked, setKnobDblClicked] = useState<"FREQ" | "GAIN" | null>(
+    null,
+  );
 
   const markerPositions = freqMarkers.map((freq) =>
     normalizedToX(freqToNormalized(freq), graphMinX, graphMaxX),
   );
-
 
   // ====================
   // Derived from state (rotation → Q / Gain / Freq)
@@ -73,6 +77,27 @@ function App() {
   const signedGain = gainValue / maxGain;
   const gainHeightFromKnob = signedGain * maxBellHeight;
   const handleYFromGain = baselineY - gainHeightFromKnob;
+  const gainRotation = gainValue * 4.5;
+  const gainHeight: number = gainHeightFromKnob;
+
+  const gainLabel = `${Math.round(gainValue)} db`;
+  const gainLabelWidth = Math.max(52, gainLabel.length * 6.8 + 12);
+  const gainLabelX = Math.max(
+    4,
+    Math.min(800 - gainLabelWidth - 4, handleX - gainLabelWidth - 14),
+  );
+  const gainLabelY = handleYFromGain - 8;
+  const showGainLabel =
+    isHandleDragging ||
+    isHandleHovered ||
+    isGainKnobHovered ||
+    (isKnobDragging && activeKnob === "GAIN");
+  
+
+  // ====================
+  // Derived from FREQ
+  // ====================
+
   const freqLabel = `${Math.round(freqValue)} Hz`;
   const freqLabelWidth = Math.max(52, freqLabel.length * 6.8 + 12);
   const freqLabelX = Math.max(
@@ -85,8 +110,7 @@ function App() {
     isHandleHovered ||
     isFreqKnobHovered ||
     (isKnobDragging && activeKnob === "FREQ");
-  const gainRotation = gainValue * 4.5;
-  const gainHeight: number = gainHeightFromKnob;
+
 
   // ====================
   // Curve inputs
@@ -240,16 +264,6 @@ function App() {
               backgroundSize: "100% 80px",
             }}
           />
-          {/* Vertical frequency lines — denser, slightly more prominent */}
-
-          {/* <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage:
-                "linear-gradient(90deg, rgba(255,255,255,0.052) 1px, transparent 1px)",
-              backgroundSize: "40px 100%",
-            }}
-          /> */}
 
           {/* EQ band — visual only */}
           <svg
@@ -259,18 +273,19 @@ function App() {
             viewBox="0 0 800 480"
           >
             {markerPositions.map((x, i) => {
-                const isMajor = majorIndexes.includes(i);
-                return (
-              <line
-                key={i}
-                x1={x}
-                x2={x}
-                y1={0}
-                y2={480} 
-                stroke="white"
-                strokeOpacity={isMajor ? 0.15 : 0.08}
-                strokeWidth={1}
-              />)
+              const isMajor = majorIndexes.includes(i);
+              return (
+                <line
+                  key={i}
+                  x1={x}
+                  x2={x}
+                  y1={0}
+                  y2={480}
+                  stroke="white"
+                  strokeOpacity={isMajor ? 0.15 : 0.08}
+                  strokeWidth={1}
+                />
+              );
             })}
             <defs>
               {/* Bell fill */}
@@ -306,38 +321,20 @@ function App() {
               strokeWidth="1.5"
               strokeOpacity="0.85"
             />
-
-            <g
-              pointerEvents="none"
-              className={cn(
-                "transition-opacity duration-150",
-                showFreqLabel ? "opacity-100" : "opacity-0",
-              )}
-            >
-              <rect
-                x={freqLabelX}
-                y={freqLabelY}
-                width={freqLabelWidth}
-                height={16}
-                rx={3}
-                fill="rgba(18,18,22,0.78)"
-                stroke="rgba(255,255,255,0.15)"
-                strokeWidth={0.7}
-              />
-              <text
-                x={freqLabelX + freqLabelWidth / 2}
-                y={freqLabelY + 8}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize="12"
-                fill="rgba(255,255,255,0.50)"
-                fontFamily="ui-monospace, monospace"
-                letterSpacing="0.02em"
-              >
-                {freqLabel}
-              </text>
-            </g>
-
+            <ValueLabel
+              show={showFreqLabel}
+              x={freqLabelX}
+              y={freqLabelY}
+              width={freqLabelWidth}
+              text={freqLabel}
+            />
+            <ValueLabel
+              show={showGainLabel}
+              x={gainLabelX}
+              y={gainLabelY}
+              width={gainLabelWidth}
+              text={gainLabel}
+            />
             {/* Handle — the draggable-looking control point */}
             <g
               style={{
@@ -379,16 +376,28 @@ function App() {
         </div>
 
         {/* Bottom control strip — 20% height, slightly darker/sunken */}
-        <div className="flex-1 bg-[#141417] flex items-center justify-center gap-20">
+        <div
+          className="flex-1 bg-[#141417] flex items-center justify-center gap-20"
+          onMouseDownCapture={() => {
+            console.log("parent click");
+            setKnobDblClicked(null);
+          }}
+        >
           <Controls
+            activeKnob={activeKnob}
             qRotation={qRotation}
             gainRotation={gainRotation}
             freqKnobRotation={freqKnobRotation}
+            knobDblClicked={knobDblClicked}
+            setKnobDblClicked={setKnobDblClicked}
             setFreqRotation={setFreqRotation}
+            setFreqValue={setFreqValue}
             freqValue={freqValue}
+            setGainValue={setGainValue}
             bandSelected={bandSelected}
             setActiveKnob={setActiveKnob}
             setIsFreqKnobHovered={setIsFreqKnobHovered}
+            setIsGainKnobHovered={setIsGainKnobHovered}
             handleKnobMouseDown={handleKnobMouseDown}
           />
         </div>

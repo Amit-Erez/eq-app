@@ -1,9 +1,11 @@
+import { MAX_FREQ, MIN_FREQ } from "../constants";
+
 export function cn(...classes: string[]) {
   return classes.filter(Boolean).join(" ")
 }
 
-const MIN_FREQ = 10;
-const MAX_FREQ = 30000;
+// const MIN_FREQ = 10;
+// const MAX_FREQ = 30000;
 
 export function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
