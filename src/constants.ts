@@ -1,3 +1,5 @@
+import type { freqBand } from "./types/Types";
+
   // Geometry
   export const baselineY = 260;
   export const maxBellHeight = 180;
@@ -27,3 +29,12 @@
   ]
 
   export const majorIndexes = [2, 4, 8, 10, 11, 13];
+
+ export const bands: freqBand[] = [
+      {type: "low-shelf", freqValue: 40, gainValue: 0, qValue: 20},
+      {type: "bell", freqValue: 160, gainValue: 0, qValue: 20},
+      {type: "bell", freqValue: 650, gainValue: 0, qValue: 20},
+      {type: "bell", freqValue: 2500, gainValue: 0, qValue: 20},
+      {type: "bell", freqValue: 5000, gainValue: 0, qValue: 20},
+      {type: "high-shelf", freqValue: 10000, gainValue: 0, qValue: 20},
+    ]

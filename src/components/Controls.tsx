@@ -1,43 +1,32 @@
+import type { Knob, KnobsSpecs } from "../types/Types";
 import { useRef, useState } from "react";
 import {
   MAX_FREQ,
-  maxAngle,
   maxGain,
   MIN_FREQ,
-  minAngle,
   minGain,
 } from "../constants";
-import { freqToNormalized } from "../lib/utils";
-import type { BandNumber, Knob, KnobsSpecs } from "../types/Types";
 
 function Controls({
-  activeKnob,
   qRotation,
   gainRotation,
   freqKnobRotation,
-  freqValue,
-  bandSelected,
   knobDblClicked,
+  selectedBandIndex,
   setKnobDblClicked,
-  setFreqValue,
-  setGainValue,
-  setFreqRotation,
   setActiveKnob,
   setIsFreqKnobHovered,
   setIsGainKnobHovered,
   handleKnobMouseDown,
+  updateBands,
 }: {
-  activeKnob: Knob;
   qRotation: number;
   gainRotation: number;
   freqKnobRotation: number;
-  freqValue: number;
-  bandSelected: BandNumber;
   knobDblClicked: "FREQ" | "GAIN" | null;
+  selectedBandIndex: number;
+  updateBands:(key: string, value: number) => void;
   setKnobDblClicked: (label: "FREQ" | "GAIN" | null) => void;
-  setFreqValue: (value: number) => void;
-  setGainValue: (value: number) => void;
-  setFreqRotation: (rotation: number) => void;
   setActiveKnob: (label: Knob) => void;
   setIsFreqKnobHovered: (isHovered: boolean) => void;
   setIsGainKnobHovered: (isHovered: boolean) => void;
@@ -45,9 +34,6 @@ function Controls({
 }) {
   const knobRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  // const [knobDblClicked, setKnobDblClicked] = useState<"FREQ" | "GAIN" | null>(
-  //   null,
-  // );
   const [freqInputValue, setFreqInputValue] = useState<string>("");
   const [gainInputValue, setGainInputValue] = useState<string>("");
 
@@ -55,21 +41,21 @@ function Controls({
     {
       label: "FREQ",
       size: 28,
-      angle: bandSelected ? freqKnobRotation : 0,
+      angle: freqKnobRotation ? freqKnobRotation : 0,
       min: "10 Hz",
       max: "30 kHz",
     },
     {
       label: "GAIN",
       size: 34,
-      angle: bandSelected ? gainRotation : 0,
+      angle: gainRotation ? gainRotation : 0,
       min: "-30",
       max: "+30",
     },
     {
       label: "Q",
       size: 28,
-      angle: bandSelected ? qRotation : 0,
+      angle: qRotation  ? qRotation : 0,
       min: "0.025",
       max: "40",
     },
@@ -78,7 +64,7 @@ function Controls({
   function handleDoubleClick(
     label: Knob,
   ) {
-    if (!bandSelected) return;
+    
     if (label === "Q") return;
   
     setKnobDblClicked(label);
@@ -103,15 +89,17 @@ function Controls({
 
     if (knobDblClicked === "FREQ") {
       const clamped = Math.max(MIN_FREQ, Math.min(MAX_FREQ, parsed));
-      setFreqValue(clamped);
-      setFreqInputValue(clamped.toString())
+      updateBands("freqValue", clamped);
+      setFreqInputValue("")
+      setKnobDblClicked(null)
       return;
     }
 
     if (knobDblClicked === "GAIN") {
       const clamped = Math.max(minGain, Math.min(maxGain, parsed));
-      setGainValue(clamped);
-      setGainInputValue(clamped.toString())
+      updateBands("gainValue", clamped);
+      setGainInputValue("")
+      setKnobDblClicked(null)
       return;
     }
   }
@@ -168,17 +156,17 @@ function Controls({
             }}
             onMouseDown={(e) => {
               setActiveKnob(label);
-              if (label === "FREQ") {
-                setFreqRotation(
-                  minAngle +
-                    freqToNormalized(freqValue) * (maxAngle - minAngle),
-                );
-              }
+              // if (label === "FREQ") {
+              //   setFreqRotation(
+              //     minAngle +
+              //       freqToNormalized(bands[selectedBandIndex].freqValue) * (maxAngle - minAngle),
+              //   );
+              // }
               handleKnobMouseDown(e);
             }}
             onDoubleClick={() => handleDoubleClick(label)}
           >
-            {label === knobDblClicked && bandSelected ? (
+            {label === knobDblClicked ? (
               <input
                 ref={inputRef}
                 type="text"
@@ -275,7 +263,7 @@ function Controls({
                 strokeLinecap="round"
                 opacity="0.10"
               />
-              {bandSelected && (
+              
                 <path
                   d={`M ${asx} ${asy} A ${arcR} ${arcR} 0 ${fillLarge} 1 ${aex} ${aey}`}
                   fill="none"
@@ -286,7 +274,7 @@ function Controls({
                   filter={`url(#arcBlur-${label})`}
                   className="group-hover:opacity-100 transition-opacity duration-150"
                 />
-              )}
+              
               {/* Min label — 7 o'clock */}
               <text
                 x={minLx}

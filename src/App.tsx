@@ -7,7 +7,7 @@ import {
   xToNormalized,
 } from "./lib/utils";
 import Controls from "./components/Controls";
-import type { BandNumber, Knob, Location } from "./types/Types";
+import type { BandNumber, freqBand, Knob, Location } from "./types/Types";
 import {
   baselineY,
   minQ,
@@ -23,6 +23,7 @@ import {
   graphMaxX,
   freqMarkers,
   majorIndexes,
+  bands,
 } from "./constants";
 import { ValueLabel } from "./components/ValueLabel";
 
@@ -30,20 +31,24 @@ function App() {
   // ====================
   // State
   // ====================
-  const graphPanelRef = useRef<HTMLDivElement | null>(null);
+
   // const [handleLoc, setHandleLoc] = useState<Location>({ x: 500, y: 155 });
+  // const [gainValue, setGainValue] = useState<number>(0);
+  // const [freqValue, setFreqValue] = useState<number>(1000);
+  // const [freqRotation, setFreqRotation] = useState(0);
+  // const [bandSelected, setBandSelected] = useState<boolean>(false);
+
+  const graphPanelRef = useRef<HTMLDivElement | null>(null);
+  const [bandsArr, setBandsArr] = useState<freqBand[]>(bands);
+  const [selectedBandIndex, setSelectedBandIndex] = useState<number>(0);
   const [isHandleDragging, setIsHandleDragging] = useState<boolean>(false);
   const [isKnobDragging, setIsKnobDragging] = useState<boolean>(false);
-  const [qRotation, setQRotation] = useState<number>(60);
-  const [gainValue, setGainValue] = useState<number>(0);
-  const [freqValue, setFreqValue] = useState<number>(1000);
-  const [freqRotation, setFreqRotation] = useState(0);
+  // const [qRotation, setQRotation] = useState<number>(60);
   const [lastMouseY, setLastMouseY] = useState<number>(0);
   const [activeKnob, setActiveKnob] = useState<Knob>(null);
   const [isFreqKnobHovered, setIsFreqKnobHovered] = useState<boolean>(false);
   const [isGainKnobHovered, setIsGainKnobHovered] = useState<boolean>(false);
   const [isHandleHovered, setIsHandleHovered] = useState<boolean>(false);
-  const [bandSelected, setBandSelected] = useState<BandNumber>(null);
   const [knobDblClicked, setKnobDblClicked] = useState<"FREQ" | "GAIN" | null>(
     null,
   );
@@ -55,32 +60,32 @@ function App() {
   // ====================
   // Derived from state (rotation → Q / Gain / Freq)
   // ====================
-  const normalizedRotation: number =
-    (qRotation - minAngle) / (maxAngle - minAngle);
-  const mappedQ: number = minQ + normalizedRotation * (maxQ - minQ);
 
-  const normalizedFreq = freqToNormalized(freqValue);
-  const freqKnobRotation = minAngle + normalizedFreq * (maxAngle - minAngle);
+  const normalizedFreq = freqToNormalized(
+    bandsArr[selectedBandIndex].freqValue,
+  );
   const handleX = normalizedToX(normalizedFreq, graphMinX, graphMaxX);
+  const freqKnobRotation = minAngle + normalizedFreq * (maxAngle - minAngle);
 
   // ====================
   // Derived from Q (Q → width)
   // ====================
-  const normalizedQ: number = (mappedQ - minQ) / (maxQ - minQ);
-  const inverted: number = 1 - normalizedQ;
-  const qRange: number = maxWidth - minWidth;
-  const width: number = minWidth + inverted * qRange;
+ const selectedNormalizedQ =
+  (bandsArr[selectedBandIndex].qValue - minQ) / (maxQ - minQ);
+
+const qRotation =
+  minAngle + selectedNormalizedQ * (maxAngle - minAngle);
 
   // ====================
   // Derived from G (Gain → height)
   // ====================
-  const signedGain = gainValue / maxGain;
+  const signedGain = bandsArr[selectedBandIndex].gainValue / maxGain;
   const gainHeightFromKnob = signedGain * maxBellHeight;
   const handleYFromGain = baselineY - gainHeightFromKnob;
-  const gainRotation = gainValue * 4.5;
+  const gainRotation = bandsArr[selectedBandIndex].gainValue * 4.5;
   const gainHeight: number = gainHeightFromKnob;
 
-  const gainLabel = `${Math.round(gainValue)} db`;
+  const gainLabel = `${Math.round(bandsArr[selectedBandIndex].gainValue)} db`;
   const gainLabelWidth = Math.max(52, gainLabel.length * 6.8 + 12);
   const gainLabelX = Math.max(
     4,
@@ -92,13 +97,12 @@ function App() {
     isHandleHovered ||
     isGainKnobHovered ||
     (isKnobDragging && activeKnob === "GAIN");
-  
 
   // ====================
   // Derived from FREQ
   // ====================
 
-  const freqLabel = `${Math.round(freqValue)} Hz`;
+  const freqLabel = `${Math.round(bandsArr[selectedBandIndex].freqValue)} Hz`;
   const freqLabelWidth = Math.max(52, freqLabel.length * 6.8 + 12);
   const freqLabelX = Math.max(
     4,
@@ -111,7 +115,6 @@ function App() {
     isFreqKnobHovered ||
     (isKnobDragging && activeKnob === "FREQ");
 
-
   // ====================
   // Curve inputs
   // ====================
@@ -120,18 +123,26 @@ function App() {
   // ====================
   // Path generation
   // ====================
-  let path: string = `M 0 ${baselineY}`;
+  // let path: string = `M 0 ${baselineY}`;
 
-  for (let x = 0; x <= 800; x += 4) {
-    const dx: number = x - handleX;
-    const bell: number = Math.exp(-(dx * dx) / (2 * width * width));
-    const y: number = baselineY - gainHeight * bell;
-    path += ` L ${x} ${y}`;
-  }
+  // for (let x = 0; x <= 800; x += 4) {
+  //   const dx: number = x - handleX;
+  //   const bell: number = Math.exp(-(dx * dx) / (2 * width * width));
+  //   const y: number = baselineY - gainHeight * bell;
+  //   path += ` L ${x} ${y}`;
+  // }
 
   // ====================
   // Handlers
   // ====================
+
+  function updateBands(key: string, value: number) {
+    setBandsArr((prev) => {
+      return prev.map((band, index) =>
+        index === selectedBandIndex ? { ...band, [key]: value } : band,
+      );
+    });
+  }
 
   function handleKnobMouseDown(e: React.MouseEvent<HTMLElement>): void {
     setIsKnobDragging(true);
@@ -140,55 +151,51 @@ function App() {
 
   function handleKnobDrag(e: React.MouseEvent<HTMLElement, MouseEvent>): void {
     if (!isKnobDragging) return;
-    if (bandSelected === null) return;
 
     const currY = e.clientY;
     const deltaY = currY - lastMouseY;
 
     if (activeKnob === "Q") {
-      const sensitivity = 1.5;
-      setQRotation((prev) => {
-        const next = prev - deltaY * sensitivity;
-        if (next > maxAngle) return maxAngle;
-        if (next < minAngle) return minAngle;
+      const sensitivity = 0.1;
+      const currentQ = bandsArr[selectedBandIndex].qValue;
+      const nextQ = currentQ - deltaY * sensitivity;
+      const clampedNextQ = Math.max(minQ, Math.min(maxQ, nextQ));
+      updateBands("qValue", clampedNextQ);
 
-        return next;
-      });
       setLastMouseY(currY);
     }
 
     if (activeKnob === "GAIN") {
       const sensitivity = 0.25;
-      setGainValue((prev) => {
-        const next = prev - deltaY * sensitivity;
-        if (next > maxGain) return maxGain;
-        if (next < minGain) return minGain;
-
-        return next;
-      });
+      const next =
+        bandsArr[selectedBandIndex].gainValue - deltaY * sensitivity || 0;
+      const clampedNext = Math.max(minGain, Math.min(maxGain, next));
+      updateBands("gainValue", clampedNext);
       setLastMouseY(currY);
     }
 
     if (activeKnob === "FREQ") {
-      setFreqRotation((prev) => {
-        const next = Math.max(minAngle, Math.min(maxAngle, prev - deltaY));
-
-        const normalized = (next - minAngle) / (maxAngle - minAngle);
-        const newFreq = normalizedToFreq(normalized);
-
-        setFreqValue(newFreq);
-
-        return next;
-      });
+      const sensitivity = 0.01;
+      const currentFreq = bandsArr[selectedBandIndex].freqValue;
+      // 1. convert to normalized (0–1)
+      const normalized = freqToNormalized(currentFreq);
+      // 2. apply mouse delta in normalized space
+      const nextNormalized = normalized - deltaY * sensitivity;
+      // 3. clamp 0–1
+      const clampedNormalized = Math.max(0, Math.min(1, nextNormalized));
+      // 4. convert back to Hz
+      const newFreq = normalizedToFreq(clampedNormalized);
+      // 5. update band
+      updateBands("freqValue", newFreq);
       setLastMouseY(currY);
     }
   }
 
-  function handleBandSelect(band: BandNumber): void {
-    if (band === bandSelected) return;
-    setBandSelected((prev) => (prev === band ? null : band));
-    console.log("Selected band:", band);
-  }
+  // function handleBandSelect(bandIndex: number): void {
+  //   if (bandIndex === bandSelected) return;
+  //   setSelectedBandIndex(bandIndex);
+  //   console.log("Selected band:", bandIndex);
+  // }
 
   function handleHandleDrag(
     e: React.MouseEvent<HTMLElement, MouseEvent>,
@@ -209,15 +216,18 @@ function App() {
     const clampedX = Math.max(0, Math.min(800, graphX));
     const normalized = xToNormalized(clampedX, graphMinX, graphMaxX);
     const newFreqValue = normalizedToFreq(normalized);
-    setFreqValue(newFreqValue);
+    updateBands("freqValue", newFreqValue);
+    // setFreqValue(newFreqValue);
 
     const distance = baselineY - clampedY;
     const newGainValue = distance * (1 / 6);
-    setGainValue(() => {
-      if (newGainValue > maxGain) return maxGain;
-      if (newGainValue < minGain) return minGain;
-      return newGainValue;
-    });
+    const clampedGainValue = Math.max(minGain, Math.min(maxGain, newGainValue));
+    updateBands("gainValue", clampedGainValue);
+    // setGainValue(() => {
+    //   if (newGainValue > maxGain) return maxGain;
+    //   if (newGainValue < minGain) return minGain;
+    //   return newGainValue;
+    // });
   }
 
   return (
@@ -253,7 +263,7 @@ function App() {
             // Top-to-bottom gradient: slightly lifted top, darker toward the divider
             background: "linear-gradient(to bottom, #1f1f24 0%, #18181c 100%)",
           }}
-          onMouseDown={() => handleBandSelect(null)}
+          // onMouseDown={() => setSelectedBandIndex(0)}
         >
           {/* Horizontal dB lines — sparse, faint */}
           <div
@@ -266,13 +276,38 @@ function App() {
           />
 
           {/* EQ band — visual only */}
-          <svg
-            className="absolute inset-0 w-full h-full"
-            style={{ pointerEvents: "none" }}
-            preserveAspectRatio="none"
-            viewBox="0 0 800 480"
-          >
-            {markerPositions.map((x, i) => {
+          {bandsArr.map((band, index) => {
+            const bandNormalizedFreq = freqToNormalized(band.freqValue);
+            const bandHandleX = normalizedToX(
+              bandNormalizedFreq,
+              graphMinX,
+              graphMaxX,
+            );
+            const bandSignedGain = band.gainValue / maxGain;
+            const bandGainHeight = bandSignedGain * maxBellHeight;
+            const bandHandleY = baselineY - bandGainHeight;
+
+            const bandNormalizedQ = (band.qValue - minQ) / (maxQ - minQ);
+const bandInvertedQ = 1 - bandNormalizedQ;
+const bandWidth = minWidth + bandInvertedQ * (maxWidth - minWidth);
+
+            let bandPath = `M 0 ${baselineY}`;
+
+            for (let x = 0; x <= 800; x += 4) {
+              const dx = x - bandHandleX;
+              const bell = Math.exp(-(dx * dx) / (2 * bandWidth * bandWidth));
+              const y = baselineY - bandGainHeight * bell;
+              bandPath += ` L ${x} ${y}`;
+            }
+            return (
+              <svg
+                className="absolute inset-0 w-full h-full"
+                style={{ pointerEvents: "none" }}
+                preserveAspectRatio="none"
+                viewBox="0 0 800 480"
+                key={index}
+              >
+                {/* {markerPositions.map((x, i) => {
               const isMajor = majorIndexes.includes(i);
               return (
                 <line
@@ -286,87 +321,100 @@ function App() {
                   strokeWidth={1}
                 />
               );
-            })}
-            <defs>
-              {/* Bell fill */}
-              <linearGradient id="bandFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="100%" stopColor="#5b8cff" stopOpacity="0.34" />
-              </linearGradient>
-              {/* Glow filter for the handle */}
-              <filter
-                id="handleGlow"
-                x="-80%"
-                y="-80%"
-                width="260%"
-                height="260%"
-              >
-                <feGaussianBlur stdDeviation="4" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
+            })} */}
+                <defs>
+                  {/* Bell fill */}
+                  <linearGradient id="bandFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="100%"
+                      stopColor="#5b8cff"
+                      stopOpacity="0.34"
+                    />
+                  </linearGradient>
+                  {/* Glow filter for the handle */}
+                  <filter
+                    id="handleGlow"
+                    x="-80%"
+                    y="-80%"
+                    width="260%"
+                    height="260%"
+                  >
+                    <feGaussianBlur stdDeviation="4" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
 
-            {/* Bell curve — fill + stroke wrapped in fade mask */}
-            <path
-              d={`${path} L 800 ${baselineY} L 0 ${baselineY} Z`}
-              fill="url(#bandFill)"
-              className={bandSelected === 1 ? "opacity-100" : "opacity-60"}
-            />
-            <path
-              d={path}
-              fill="none"
-              stroke="#5b8cff"
-              strokeWidth="1.5"
-              strokeOpacity="0.85"
-            />
-            <ValueLabel
-              show={showFreqLabel}
-              x={freqLabelX}
-              y={freqLabelY}
-              width={freqLabelWidth}
-              text={freqLabel}
-            />
-            <ValueLabel
-              show={showGainLabel}
-              x={gainLabelX}
-              y={gainLabelY}
-              width={gainLabelWidth}
-              text={gainLabel}
-            />
-            {/* Handle — the draggable-looking control point */}
-            <g
-              style={{
-                transformOrigin: `${handleX}px ${handleYFromGain}px`,
-                transition: "transform 0.15s ease",
-                cursor: "pointer",
-              }}
-              className="group hover:scale-120"
-              pointerEvents="all"
-              onMouseEnter={() => setIsHandleHovered(true)}
-              onMouseLeave={() => setIsHandleHovered(false)}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                handleBandSelect(1);
-                setIsHandleDragging(true);
-              }}
-              onMouseUp={(e) => {
-                e.stopPropagation();
-                setIsHandleDragging(false);
-              }}
-            >
-              <circle
-                cx={handleX}
-                cy={handleYFromGain}
-                r="6"
-                fill="#7aa8ff"
-                filter="url(#handleGlow)"
-              />
-              {/* Inner bright dot */}
-              <circle cx={handleX} cy={handleYFromGain} r="3" fill="#c8daff" />
-            </g>
-          </svg>
+                {/* Bell curve — fill + stroke wrapped in fade mask */}
+                <path
+                  d={`${bandPath} L 800 ${baselineY} L 0 ${baselineY} Z`}
+                  fill="url(#bandFill)"
+                  className={
+                    selectedBandIndex === index ? "opacity-100" : "opacity-60"
+                  }
+                />
+                <path
+                  d={bandPath}
+                  fill="none"
+                  stroke="#5b8cff"
+                  strokeWidth="1.5"
+                  strokeOpacity="0.85"
+                />
+                <ValueLabel
+                  show={showFreqLabel}
+                  x={freqLabelX}
+                  y={freqLabelY}
+                  width={freqLabelWidth}
+                  text={freqLabel}
+                />
+                <ValueLabel
+                  show={showGainLabel}
+                  x={gainLabelX}
+                  y={gainLabelY}
+                  width={gainLabelWidth}
+                  text={gainLabel}
+                />
+                {/* Handle — the draggable-looking control point */}
+                <g
+                  style={{
+                    transformOrigin: `${bandHandleX}px ${bandHandleY}px`,
+                    transition: "transform 0.15s ease",
+                    cursor: "pointer",
+                  }}
+                  className="group hover:scale-120"
+                  pointerEvents="all"
+                  onMouseEnter={() => setIsHandleHovered(true)}
+                  onMouseLeave={() => setIsHandleHovered(false)}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setSelectedBandIndex(index);
+                    setIsHandleDragging(true);
+                  }}
+                  onMouseUp={(e) => {
+                    e.stopPropagation();
+                    setIsHandleDragging(false);
+                  }}
+                >
+                  <circle
+                    cx={bandHandleX}
+                    cy={bandHandleY}
+                    r="6"
+                    fill="#7aa8ff"
+                    filter="url(#handleGlow)"
+                  />
+                  {/* Inner bright dot */}
+                  <circle
+                    cx={bandHandleX}
+                    cy={bandHandleY}
+                    r="3"
+                    fill="#c8daff"
+                  />
+                </g>
+              </svg>
+            );
+          })}
         </div>
 
         {/* Divider — stronger than the grid lines, 2px compound treatment */}
@@ -379,22 +427,18 @@ function App() {
         <div
           className="flex-1 bg-[#141417] flex items-center justify-center gap-20"
           onMouseDownCapture={() => {
-            console.log("parent click");
             setKnobDblClicked(null);
           }}
         >
           <Controls
-            activeKnob={activeKnob}
             qRotation={qRotation}
             gainRotation={gainRotation}
             freqKnobRotation={freqKnobRotation}
             knobDblClicked={knobDblClicked}
+            // bandSelected={bandSelected}
+            selectedBandIndex={selectedBandIndex}
             setKnobDblClicked={setKnobDblClicked}
-            setFreqRotation={setFreqRotation}
-            setFreqValue={setFreqValue}
-            freqValue={freqValue}
-            setGainValue={setGainValue}
-            bandSelected={bandSelected}
+            updateBands={updateBands}
             setActiveKnob={setActiveKnob}
             setIsFreqKnobHovered={setIsFreqKnobHovered}
             setIsGainKnobHovered={setIsGainKnobHovered}

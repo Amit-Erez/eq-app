@@ -11,3 +11,11 @@ export type KnobsSpecs = {
 };
 
 export type BandNumber = 1 | 2 | 3 | 4 | 5 | 6 | null
+
+export type freqBand = {
+  type: "bell" | "low-shelf" | "high-shelf";
+  freqValue: number;
+  gainValue: number;
+  qValue: number;
+};
+
