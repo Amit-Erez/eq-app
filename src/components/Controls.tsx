@@ -12,7 +12,6 @@ function Controls({
   gainRotation,
   freqKnobRotation,
   knobDblClicked,
-  selectedBandIndex,
   setKnobDblClicked,
   setActiveKnob,
   setIsFreqKnobHovered,
@@ -24,7 +23,6 @@ function Controls({
   gainRotation: number;
   freqKnobRotation: number;
   knobDblClicked: "FREQ" | "GAIN" | null;
-  selectedBandIndex: number;
   updateBands:(key: string, value: number) => void;
   setKnobDblClicked: (label: "FREQ" | "GAIN" | null) => void;
   setActiveKnob: (label: Knob) => void;
@@ -156,12 +154,6 @@ function Controls({
             }}
             onMouseDown={(e) => {
               setActiveKnob(label);
-              // if (label === "FREQ") {
-              //   setFreqRotation(
-              //     minAngle +
-              //       freqToNormalized(bands[selectedBandIndex].freqValue) * (maxAngle - minAngle),
-              //   );
-              // }
               handleKnobMouseDown(e);
             }}
             onDoubleClick={() => handleDoubleClick(label)}

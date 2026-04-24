@@ -31,10 +31,10 @@ import type { freqBand } from "./types/Types";
   export const majorIndexes = [2, 4, 8, 10, 11, 13];
 
  export const bands: freqBand[] = [
-      {type: "low-shelf", freqValue: 40, gainValue: 0, qValue: 20},
-      {type: "bell", freqValue: 160, gainValue: 0, qValue: 20},
-      {type: "bell", freqValue: 650, gainValue: 0, qValue: 20},
-      {type: "bell", freqValue: 2500, gainValue: 0, qValue: 20},
-      {type: "bell", freqValue: 5000, gainValue: 0, qValue: 20},
-      {type: "high-shelf", freqValue: 10000, gainValue: 0, qValue: 20},
+      {type: "low-shelf", freqValue: 40, gainValue: 0, qValue: 20, color: "#fff"},
+      {type: "bell", freqValue: 160, gainValue: 0, qValue: 20, color: "#A378C6"}, 
+      {type: "bell", freqValue: 650, gainValue: 0, qValue: 20, color: "#5b8cff"},
+      {type: "bell", freqValue: 2500, gainValue: 0, qValue: 20, color: "#85C272"},
+      {type: "bell", freqValue: 5000, gainValue: 0, qValue: 20, color: "#F2B34B"},
+      {type: "high-shelf", freqValue: 10000, gainValue: 0, qValue: 20, color: "#fff"},
     ]
