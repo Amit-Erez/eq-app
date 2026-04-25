@@ -1,17 +1,17 @@
-import type { Knob, KnobsSpecs } from "../types/Types";
+import type { freqBand, Knob, KnobsSpecs } from "../types/Types";
 import { useRef, useState } from "react";
+import { MAX_FREQ, maxGain, MIN_FREQ, minGain } from "../constants";
 import {
-  MAX_FREQ,
-  maxGain,
-  MIN_FREQ,
-  minGain,
-} from "../constants";
+  getKnobVisuals,
+} from "../lib/utils/knobMath";
 
 function Controls({
+  bandsArr,
   qRotation,
   gainRotation,
   freqKnobRotation,
   knobDblClicked,
+  selectedBandIndex,
   setKnobDblClicked,
   setActiveKnob,
   setIsFreqKnobHovered,
@@ -19,11 +19,13 @@ function Controls({
   handleKnobMouseDown,
   updateBands,
 }: {
+  bandsArr: freqBand[];
   qRotation: number;
   gainRotation: number;
   freqKnobRotation: number;
   knobDblClicked: "FREQ" | "GAIN" | null;
-  updateBands:(key: string, value: number) => void;
+  selectedBandIndex: number | null;
+  updateBands: (key: string, value: number) => void;
   setKnobDblClicked: (label: "FREQ" | "GAIN" | null) => void;
   setActiveKnob: (label: Knob) => void;
   setIsFreqKnobHovered: (isHovered: boolean) => void;
@@ -53,18 +55,15 @@ function Controls({
     {
       label: "Q",
       size: 28,
-      angle: qRotation  ? qRotation : 0,
+      angle: qRotation ? qRotation : 0,
       min: "0.025",
       max: "40",
     },
   ];
 
-  function handleDoubleClick(
-    label: Knob,
-  ) {
-    
+  function handleDoubleClick(label: Knob) {
     if (label === "Q") return;
-  
+
     setKnobDblClicked(label);
     setTimeout(() => {
       inputRef.current?.focus();
@@ -88,16 +87,16 @@ function Controls({
     if (knobDblClicked === "FREQ") {
       const clamped = Math.max(MIN_FREQ, Math.min(MAX_FREQ, parsed));
       updateBands("freqValue", clamped);
-      setFreqInputValue("")
-      setKnobDblClicked(null)
+      setFreqInputValue("");
+      setKnobDblClicked(null);
       return;
     }
 
     if (knobDblClicked === "GAIN") {
       const clamped = Math.max(minGain, Math.min(maxGain, parsed));
       updateBands("gainValue", clamped);
-      setGainInputValue("")
-      setKnobDblClicked(null)
+      setGainInputValue("");
+      setKnobDblClicked(null);
       return;
     }
   }
@@ -110,34 +109,25 @@ function Controls({
         const cy = r + 6;
         const svgSize = (r + 6) * 2;
 
-        // Indicator line
-        const rad = ((angle - 90) * Math.PI) / 180;
-        const lineInner = r * 0.38;
-        const lineOuter = r * 0.78;
-        const x1 = cx + Math.cos(rad) * lineInner;
-        const y1 = cy + Math.sin(rad) * lineInner;
-        const x2 = cx + Math.cos(rad) * lineOuter;
-        const y2 = cy + Math.sin(rad) * lineOuter;
+        const {
+          x1,
+          y1,
+          x2,
+          y2,
+          arcR,
+          asx,
+          asy,
+          aex,
+          aey,
+          tex,
+          tey,
+          fillLarge,
+          minLx,
+          minLy,
+          maxLx,
+          maxLy,
+        } = getKnobVisuals({ angle, r, cx, cy });
 
-        // Arc: min = -135° (7 o'clock), max = 135° (5 o'clock)
-        const minDeg = -135;
-        const maxDeg = 135;
-        const arcR = r + 3.5;
-        const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180;
-        const asx = cx + arcR * Math.cos(toRad(minDeg));
-        const asy = cy + arcR * Math.sin(toRad(minDeg));
-        const aex = cx + arcR * Math.cos(toRad(angle));
-        const aey = cy + arcR * Math.sin(toRad(angle));
-        const tex = cx + arcR * Math.cos(toRad(maxDeg));
-        const tey = cy + arcR * Math.sin(toRad(maxDeg));
-        const fillLarge = angle - minDeg > 180 ? 1 : 0;
-
-        // Min/max label positions — just outside the arc
-        const labelR = arcR + 7;
-        const minLx = cx + labelR * Math.cos(toRad(minDeg));
-        const minLy = cy + labelR * Math.sin(toRad(minDeg));
-        const maxLx = cx + labelR * Math.cos(toRad(maxDeg));
-        const maxLy = cy + labelR * Math.sin(toRad(maxDeg));
 
         return (
           <div
@@ -255,18 +245,18 @@ function Controls({
                 strokeLinecap="round"
                 opacity="0.10"
               />
-              
-                <path
-                  d={`M ${asx} ${asy} A ${arcR} ${arcR} 0 ${fillLarge} 1 ${aex} ${aey}`}
-                  fill="none"
-                  stroke="#7aa8ff"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  opacity="0.35"
-                  filter={`url(#arcBlur-${label})`}
-                  className="group-hover:opacity-100 transition-opacity duration-150"
-                />
-              
+
+              <path
+                d={`M ${asx} ${asy} A ${arcR} ${arcR} 0 ${fillLarge} 1 ${aex} ${aey}`}
+                fill="none"
+                stroke={bandsArr[selectedBandIndex!].color}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                opacity="0.5"
+                filter={`url(#arcBlur-${label})`}
+                className="group-hover:opacity-100 transition-opacity duration-150"
+              />
+
               {/* Min label — 7 o'clock */}
               <text
                 x={minLx}

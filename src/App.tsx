@@ -1,11 +1,13 @@
 import { useRef, useState } from "react";
+import logo from "./assets/AE-LOGO.svg";
+import { cn } from "./lib/utils/utils";
 import {
-  cn,
   freqToNormalized,
+  getBandVisuals,
   normalizedToFreq,
   normalizedToX,
   xToNormalized,
-} from "./lib/utils";
+} from "./lib/utils/eqMath";
 import Controls from "./components/Controls";
 import type { freqBand, Knob } from "./types/Types";
 import {
@@ -14,8 +16,6 @@ import {
   maxQ,
   minGain,
   maxGain,
-  minWidth,
-  maxWidth,
   minAngle,
   maxAngle,
   maxBellHeight,
@@ -109,7 +109,6 @@ function App() {
     isFreqKnobHovered ||
     (isKnobDragging && activeKnob === "FREQ");
 
-
   // ====================
   // Handlers
   // ====================
@@ -169,7 +168,6 @@ function App() {
     }
   }
 
-
   function handleHandleDrag(
     e: React.MouseEvent<HTMLElement, MouseEvent>,
   ): void {
@@ -196,12 +194,11 @@ function App() {
     const newGainValue = distance * (1 / 6);
     const clampedGainValue = Math.max(minGain, Math.min(maxGain, newGainValue));
     updateBands("gainValue", clampedGainValue);
-
   }
 
   return (
     <div
-      className="min-h-screen w-full flex items-center justify-center bg-[#111113] select-none"
+      className="relative min-h-screen w-full flex items-center justify-center bg-[#111113] select-none"
       onMouseMove={(e) => {
         if (isKnobDragging) handleKnobDrag(e);
         if (isHandleDragging) handleHandleDrag(e);
@@ -213,6 +210,7 @@ function App() {
     >
       <div
         className={cn(
+          "relative",
           "w-[70%] max-w-200 h-150",
           "flex flex-col",
           "rounded-xl",
@@ -224,6 +222,12 @@ function App() {
           "shadow-[0_2px_4px_rgba(0,0,0,0.55),0_8px_24px_rgba(0,0,0,0.45),0_32px_72px_rgba(0,0,0,0.3)]",
         )}
       >
+        <div className="absolute top-0 left-0 flex items-center w-full h-10 p-2 bg-[#141417] border-b-2 border-[#19191c] ring-1 ring-inset ring-white/5 overflow-hidden z-10">
+          <img src={logo} alt="logo" className="invert-25 w-8" />
+          <h1 className="ml-2 text-[21px] font-semibold italic tracking-wide text-white/25">
+            EQ-6
+          </h1>
+        </div>
         {/* Top row — EQ display area */}
         <div
           ref={graphPanelRef}
@@ -266,44 +270,20 @@ function App() {
 
             {/* EQ band — visual only */}
             {bandsArr.map((band, index) => {
-              const bandNormalizedFreq = freqToNormalized(band.freqValue);
-              const bandHandleX = normalizedToX(
-                bandNormalizedFreq,
+              const { bandPath } = getBandVisuals({
+                freqValue: band.freqValue,
+                gainValue: band.gainValue,
+                qValue: band.qValue,
+                bandType: band.type,
                 graphMinX,
                 graphMaxX,
-              );
-              const bandSignedGain = band.gainValue / maxGain;
-              const bandGainHeight = bandSignedGain * maxBellHeight;
+                maxGain,
+                maxBellHeight,
+                baselineY,
+              });
 
-              const bandNormalizedQ = (band.qValue - minQ) / (maxQ - minQ);
-              const bandInvertedQ = 1 - bandNormalizedQ;
-              const bandWidth =
-                minWidth + bandInvertedQ * (maxWidth - minWidth);
-
-              let bandPath = `M 0 ${baselineY}`;
               const fillId = `bandFill-${index}`;
 
-              for (let x = 0; x <= 800; x += 4) {
-                const dx = x - bandHandleX;
-                const slope = bandWidth / 2;
-
-                const bell = Math.exp(-(dx * dx) / (2 * bandWidth * bandWidth));
-
-                const lowShelf = 1 / (1 + Math.exp((x - bandHandleX) / slope));
-
-                const highShelf = 1 / (1 + Math.exp((bandHandleX - x) / slope));
-
-                const shape =
-                  band.type === "low-shelf"
-                    ? lowShelf
-                    : band.type === "high-shelf"
-                      ? highShelf
-                      : bell;
-
-                const y = baselineY - bandGainHeight * shape;
-
-                bandPath += ` L ${x} ${y}`;
-              }
               return (
                 <svg
                   className="absolute inset-0 w-full h-full"
@@ -370,14 +350,18 @@ function App() {
               );
             })}
             {bandsArr.map((band, index) => {
-              const bandNormalizedFreq = freqToNormalized(band.freqValue);
-              const bandHandleX = normalizedToX(
-                bandNormalizedFreq,
+              const { bandHandleX, bandGainHeight } = getBandVisuals({
+                freqValue: band.freqValue,
+                gainValue: band.gainValue,
+                qValue: band.qValue,
+                bandType: band.type,
                 graphMinX,
                 graphMaxX,
-              );
-              const bandSignedGain = band.gainValue / maxGain;
-              const bandGainHeight = bandSignedGain * maxBellHeight;
+                maxGain,
+                maxBellHeight,
+                baselineY,
+              });
+
               const bandHandleY =
                 band.type === "bell"
                   ? baselineY - bandGainHeight
@@ -446,6 +430,8 @@ function App() {
           }}
         >
           <Controls
+            bandsArr={bandsArr}
+            selectedBandIndex={selectedBandIndex}
             qRotation={qRotation}
             gainRotation={gainRotation}
             freqKnobRotation={freqKnobRotation}
