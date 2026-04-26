@@ -6,10 +6,14 @@ import {
   minQ,
   minWidth,
 } from "../../constants";
+import type { freqBand } from "../../types/Types";
 import { clamp } from "./utils";
 
-// 10Hz -> 0
-// 30000Hz -> 1
+// *******************
+// Basic converters
+// *******************
+
+// 10Hz -> 0 ... 30000Hz -> 1
 export function freqToNormalized(freq: number) {
   const safeFreq = clamp(freq, MIN_FREQ, MAX_FREQ);
 
@@ -19,8 +23,7 @@ export function freqToNormalized(freq: number) {
   );
 }
 
-// 0 -> 10Hz
-// 1 -> 30000Hz
+// 0 -> 10Hz ... 1 -> 30000Hz
 export function normalizedToFreq(normalized: number) {
   const safeNormalized = clamp(normalized, 0, 1);
 
@@ -31,18 +34,30 @@ export function normalizedToFreq(normalized: number) {
   );
 }
 
-// 0 -> left edge
-// 1 -> right edge
+// 0 -> left edge ... 1 -> right edge
 export function normalizedToX(normalized: number, minX: number, maxX: number) {
   const safeNormalized = clamp(normalized, 0, 1);
   return minX + safeNormalized * (maxX - minX);
 }
 
-// left edge -> 0
-// right edge -> 1
+// left edge -> 0 ... right edge -> 1
 export function xToNormalized(x: number, minX: number, maxX: number) {
   const safeX = clamp(x, minX, maxX);
   return (safeX - minX) / (maxX - minX);
+}
+
+// *************************
+// Simple derived helpers
+// *************************
+
+export function getMarkerPositions(
+  freqMarkers: number[],
+  graphMinX: number,
+  graphMaxX: number
+) {
+  return freqMarkers.map((freq) =>
+    normalizedToX(freqToNormalized(freq), graphMinX, graphMaxX)
+  );
 }
 
 // Q → width
@@ -67,6 +82,10 @@ export function gainToHeight(
   const signedGain = gainValue / maxGain;
   return signedGain * maxHeight;
 }
+
+// ********************
+// Shape/path helpers
+// ********************
 
 export function getBandShapeAmount(
   x: number,
@@ -112,6 +131,10 @@ export function buildBandPath({
   return path;
 }
 
+// ******************
+// Composed helpers
+// ******************
+
 export function getBandVisualValues({
   freqValue,
   gainValue,
@@ -144,6 +167,49 @@ export function getBandVisualValues({
     bandGainHeight,
     bandWidth,
   };
+}
+
+export function getSelectedBandValues({
+  band,
+  graphMinX,
+  graphMaxX,
+  maxGain,
+  maxBellHeight,
+  baselineY,
+  minAngle,
+  maxAngle,
+}: {
+  band: freqBand;
+  graphMinX: number;
+  graphMaxX: number;
+  maxGain: number;
+  maxBellHeight: number;  
+  baselineY: number;
+  minAngle: number;
+  maxAngle: number;
+}){
+
+const normalizedFreq = freqToNormalized(band.freqValue);
+const handleX = normalizedToX(normalizedFreq, graphMinX, graphMaxX);
+const freqKnobRotation = minAngle + normalizedFreq * (maxAngle - minAngle);
+
+const selectedNormalizedQ =
+  (band.qValue - minQ) / (maxQ - minQ);
+
+const qRotation = minAngle + selectedNormalizedQ * (maxAngle - minAngle);
+
+const signedGain = band.gainValue / maxGain;
+const gainHeightFromKnob = signedGain * maxBellHeight;
+const handleYFromGain = baselineY - gainHeightFromKnob;
+const gainRotation = band.gainValue * 4.5;
+
+  return {
+  handleX,
+  handleYFromGain,
+  freqKnobRotation,
+  qRotation,
+  gainRotation
+  }
 }
 
 export function getBandVisuals({

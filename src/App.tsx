@@ -4,8 +4,9 @@ import { cn } from "./lib/utils/utils";
 import {
   freqToNormalized,
   getBandVisuals,
+  getMarkerPositions,
+  getSelectedBandValues,
   normalizedToFreq,
-  normalizedToX,
   xToNormalized,
 } from "./lib/utils/eqMath";
 import Controls from "./components/Controls";
@@ -25,12 +26,14 @@ import {
   majorIndexes,
   bands,
 } from "./constants";
-import { ValueLabel } from "./components/ValueLabel";
+import { CurveLine } from "./components/CurveLine";
+import { BandHandles } from "./components/BandHandles";
+import { getFreqLabelValues, getGainLabelValues } from "./lib/utils/uiMath";
 
 function App() {
-  // ====================
-  // State
-  // ====================
+  // ============================================================
+  //                          State
+  // ============================================================
 
   const graphPanelRef = useRef<HTMLDivElement | null>(null);
   const [bandsArr, setBandsArr] = useState<freqBand[]>(bands);
@@ -46,72 +49,62 @@ function App() {
     null,
   );
 
+  // Which band should display labels
   const labelBandIndex =
     hoveredBandIndex !== null ? hoveredBandIndex : selectedBandIndex;
 
-  const markerPositions = freqMarkers.map((freq) =>
-    normalizedToX(freqToNormalized(freq), graphMinX, graphMaxX),
-  );
+  // Grid marker positions
+  const markerPositions = getMarkerPositions(freqMarkers, graphMinX, graphMaxX);
 
-  // ====================
-  // Derived from state (rotation → Q / Gain / Freq)
-  // ====================
+  // Selected band visual values
+  const {
+    handleX,
+    handleYFromGain,
+    freqKnobRotation,
+    qRotation,
+    gainRotation,
+  } = getSelectedBandValues({
+    band: bandsArr[selectedBandIndex],
+    graphMinX,
+    graphMaxX,
+    maxGain,
+    maxBellHeight,
+    baselineY,
+    minAngle,
+    maxAngle,
+  });
 
-  const normalizedFreq = freqToNormalized(
-    bandsArr[selectedBandIndex].freqValue,
-  );
-  const handleX = normalizedToX(normalizedFreq, graphMinX, graphMaxX);
-  const freqKnobRotation = minAngle + normalizedFreq * (maxAngle - minAngle);
+  // Gain label values
+  const { gainLabel, gainLabelWidth, gainLabelX, gainLabelY } =
+    getGainLabelValues({
+      gainValue: bandsArr[labelBandIndex].gainValue,
+      handleX,
+      handleYFromGain,
+    });
 
-  // ====================
-  // Derived from Q (Q → width)
-  // ====================
-  const selectedNormalizedQ =
-    (bandsArr[selectedBandIndex].qValue - minQ) / (maxQ - minQ);
-
-  const qRotation = minAngle + selectedNormalizedQ * (maxAngle - minAngle);
-
-  // ====================
-  // Derived from G (Gain → height)
-  // ====================
-  const signedGain = bandsArr[selectedBandIndex].gainValue / maxGain;
-  const gainHeightFromKnob = signedGain * maxBellHeight;
-  const handleYFromGain = baselineY - gainHeightFromKnob;
-  const gainRotation = bandsArr[selectedBandIndex].gainValue * 4.5;
-
-  const gainLabel = `${Math.round(bandsArr[labelBandIndex].gainValue)} db`;
-
-  const gainLabelWidth = Math.max(52, gainLabel.length * 6.8 + 12);
-  const gainLabelX = Math.max(
-    4,
-    Math.min(800 - gainLabelWidth - 4, handleX - gainLabelWidth - 14),
-  );
-  const gainLabelY = handleYFromGain - 8;
+  // Gain label visibility
   const showGainLabel =
     isHandleDragging ||
     isGainKnobHovered ||
     (isKnobDragging && activeKnob === "GAIN");
 
-  // ====================
-  // Derived from FREQ
-  // ====================
+  // Frequency label values
+  const { freqLabel, freqLabelWidth, freqLabelX, freqLabelY } =
+    getFreqLabelValues({
+      freqValue: bandsArr[labelBandIndex].freqValue,
+      handleX,
+      handleYFromGain,
+    });
 
-  const freqLabel = `${Math.round(bandsArr[labelBandIndex].freqValue)} Hz`;
-
-  const freqLabelWidth = Math.max(52, freqLabel.length * 6.8 + 12);
-  const freqLabelX = Math.max(
-    4,
-    Math.min(800 - freqLabelWidth - 4, handleX - freqLabelWidth / 2),
-  );
-  const freqLabelY = handleYFromGain - 28;
+  // Frequency label visibility
   const showFreqLabel =
     isHandleDragging ||
     isFreqKnobHovered ||
     (isKnobDragging && activeKnob === "FREQ");
 
-  // ====================
-  // Handlers
-  // ====================
+  // ==========================================================
+  //                       Handlers
+  // ==========================================================
 
   function updateBands(key: string, value: number) {
     setBandsArr((prev) => {
@@ -285,68 +278,87 @@ function App() {
               const fillId = `bandFill-${index}`;
 
               return (
-                <svg
-                  className="absolute inset-0 w-full h-full"
-                  style={{ pointerEvents: "none" }}
-                  preserveAspectRatio="none"
-                  viewBox="0 0 800 480"
+                <CurveLine
                   key={index}
-                >
-                  <defs>
-                    {/* Bell fill */}
-                    <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="100%"
-                        stopColor={band.color}
-                        stopOpacity="0.34"
-                      />
-                    </linearGradient>
-                    {/* Glow filter for the handle */}
-                    <filter
-                      id="handleGlow"
-                      x="-80%"
-                      y="-80%"
-                      width="260%"
-                      height="260%"
-                    >
-                      <feGaussianBlur stdDeviation="4" result="blur" />
-                      <feMerge>
-                        <feMergeNode in="blur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
+                  band={band}
+                  fillId={fillId}
+                  index={index}
+                  bandPath={bandPath}
+                  baselineY={baselineY}
+                  selectedBandIndex={selectedBandIndex}
+                  showFreqLabel={showFreqLabel}
+                  freqLabelX={freqLabelX}
+                  freqLabelY={freqLabelY}
+                  freqLabelWidth={freqLabelWidth}
+                  freqLabel={freqLabel}
+                  showGainLabel={showGainLabel}
+                  gainLabelX={gainLabelX}
+                  gainLabelY={gainLabelY}
+                  gainLabelWidth={gainLabelWidth}
+                  gainLabel={gainLabel}
+                />
+                // <svg
+                //   className="absolute inset-0 w-full h-full"
+                //   style={{ pointerEvents: "none" }}
+                //   preserveAspectRatio="none"
+                //   viewBox="0 0 800 480"
+                //   key={index}
+                // >
+                //   <defs>
+                //     {/* Bell fill */}
+                //     <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+                //       <stop
+                //         offset="100%"
+                //         stopColor={band.color}
+                //         stopOpacity="0.34"
+                //       />
+                //     </linearGradient>
+                //     {/* Glow filter for the handle */}
+                //     <filter
+                //       id="handleGlow"
+                //       x="-80%"
+                //       y="-80%"
+                //       width="260%"
+                //       height="260%"
+                //     >
+                //       <feGaussianBlur stdDeviation="4" result="blur" />
+                //       <feMerge>
+                //         <feMergeNode in="blur" />
+                //         <feMergeNode in="SourceGraphic" />
+                //       </feMerge>
+                //     </filter>
+                //   </defs>
 
-                  {/* Bell curve — fill + stroke wrapped in fade mask */}
-                  <path
-                    d={`${bandPath} L 800 ${baselineY} L 0 ${baselineY} Z`}
-                    fill={`url(#${fillId})`}
-                    className={
-                      selectedBandIndex === index ? "opacity-100" : "opacity-40"
-                    }
-                  />
-                  <path
-                    d={bandPath}
-                    fill="none"
-                    stroke={band.color}
-                    strokeWidth="1.5"
-                    strokeOpacity="0.85"
-                  />
-                  <ValueLabel
-                    show={showFreqLabel}
-                    x={freqLabelX}
-                    y={freqLabelY}
-                    width={freqLabelWidth}
-                    text={freqLabel}
-                  />
-                  <ValueLabel
-                    show={showGainLabel}
-                    x={gainLabelX}
-                    y={gainLabelY}
-                    width={gainLabelWidth}
-                    text={gainLabel}
-                  />
-                </svg>
+                //   {/* Bell curve — fill + stroke wrapped in fade mask */}
+                //   <path
+                //     d={`${bandPath} L 800 ${baselineY} L 0 ${baselineY} Z`}
+                //     fill={`url(#${fillId})`}
+                //     className={
+                //       selectedBandIndex === index ? "opacity-100" : "opacity-40"
+                //     }
+                //   />
+                //   <path
+                //     d={bandPath}
+                //     fill="none"
+                //     stroke={band.color}
+                //     strokeWidth="1.5"
+                //     strokeOpacity="0.85"
+                //   />
+                //   <ValueLabel
+                //     show={showFreqLabel}
+                //     x={freqLabelX}
+                //     y={freqLabelY}
+                //     width={freqLabelWidth}
+                //     text={freqLabel}
+                //   />
+                //   <ValueLabel
+                //     show={showGainLabel}
+                //     x={gainLabelX}
+                //     y={gainLabelY}
+                //     width={gainLabelWidth}
+                //     text={gainLabel}
+                //   />
+                // </svg>
               );
             })}
             {bandsArr.map((band, index) => {
@@ -368,49 +380,62 @@ function App() {
                   : baselineY - bandGainHeight * 0.5;
 
               return (
-                <svg
-                  className="absolute inset-0 w-full h-full"
-                  style={{ pointerEvents: "none" }}
-                  preserveAspectRatio="none"
-                  viewBox="0 0 800 480"
+                <BandHandles
                   key={index}
-                >
-                  <g
-                    style={{
-                      transformOrigin: `${bandHandleX}px ${bandHandleY}px`,
-                      transition: "transform 0.15s ease",
-                      cursor: "pointer",
-                    }}
-                    className="group hover:scale-120"
-                    pointerEvents="all"
-                    onMouseEnter={() => setHoveredBandIndex(index)}
-                    onMouseLeave={() => setHoveredBandIndex(null)}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      setSelectedBandIndex(index);
-                      setIsHandleDragging(true);
-                    }}
-                    onMouseUp={(e) => {
-                      e.stopPropagation();
-                      setIsHandleDragging(false);
-                    }}
-                  >
-                    <circle
-                      cx={bandHandleX}
-                      cy={bandHandleY}
-                      r="6"
-                      fill={band.color}
-                      filter="url(#handleGlow)"
-                    />
-                    {/* Inner bright dot */}
-                    <circle
-                      cx={bandHandleX}
-                      cy={bandHandleY}
-                      r="3"
-                      fill={band.color}
-                    />
-                  </g>
-                </svg>
+                  band={band}
+                  index={index}
+                  bandHandleX={bandHandleX}
+                  bandHandleY={bandHandleY}
+                  setHoveredBandIndex={setHoveredBandIndex}
+                  setSelectedBandIndex={(index) => {
+                    if (index !== null) setSelectedBandIndex(index);
+                  }}
+                  setIsHandleDragging={setIsHandleDragging}
+                />
+                //
+                // <svg
+                //   className="absolute inset-0 w-full h-full"
+                //   style={{ pointerEvents: "none" }}
+                //   preserveAspectRatio="none"
+                //   viewBox="0 0 800 480"
+                //   key={index}
+                // >
+                //   <g
+                //     style={{
+                //       transformOrigin: `${bandHandleX}px ${bandHandleY}px`,
+                //       transition: "transform 0.15s ease",
+                //       cursor: "pointer",
+                //     }}
+                //     className="group hover:scale-120"
+                //     pointerEvents="all"
+                //     onMouseEnter={() => setHoveredBandIndex(index)}
+                //     onMouseLeave={() => setHoveredBandIndex(null)}
+                //     onMouseDown={(e) => {
+                //       e.stopPropagation();
+                //       setSelectedBandIndex(index);
+                //       setIsHandleDragging(true);
+                //     }}
+                //     onMouseUp={(e) => {
+                //       e.stopPropagation();
+                //       setIsHandleDragging(false);
+                //     }}
+                //   >
+                //     <circle
+                //       cx={bandHandleX}
+                //       cy={bandHandleY}
+                //       r="6"
+                //       fill={band.color}
+                //       filter="url(#handleGlow)"
+                //     />
+                //     {/* Inner bright dot */}
+                //     <circle
+                //       cx={bandHandleX}
+                //       cy={bandHandleY}
+                //       r="3"
+                //       fill={band.color}
+                //     />
+                //   </g>
+                // </svg>
               );
             })}
           </svg>
