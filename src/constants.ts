@@ -1,4 +1,4 @@
-import type { freqBand } from "./types/Types";
+import type { freqBand, Track } from "./types/Types";
 
   // Geometry
   export const baselineY = 270;
@@ -37,4 +37,10 @@ import type { freqBand } from "./types/Types";
       {type: "bell", freqValue: 2500, gainValue: 0, qValue: 20, color: "#2FA236 "},
       {type: "bell", freqValue: 5000, gainValue: 0, qValue: 20, color: "#EEDE04 "},
       {type: "high-shelf", freqValue: 10000, gainValue: 0, qValue: 20, color: "#fff"},
+    ]
+
+    export const tracks: Track[] = [
+      {fileName: "SkyMover", name: "Amit Erez - Sky Mover"},
+      {fileName: "Sanitarium", name: "Metallica - Welcome Home (Sanitarium)"},
+      {fileName: "MorningFighter", name: "The Secret Sea - Morning Fighter"},
     ]

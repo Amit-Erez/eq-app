@@ -47,3 +47,7 @@ export type handleProps = {
   setIsHandleDragging: (isDragging: boolean) => void;
 };
 
+export type Track = {
+  fileName: string;
+  name: string;
+}

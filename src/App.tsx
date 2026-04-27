@@ -29,6 +29,7 @@ import {
 import { CurveLine } from "./components/CurveLine";
 import { BandHandles } from "./components/BandHandles";
 import { getFreqLabelValues, getGainLabelValues } from "./lib/utils/uiMath";
+import { AudioPlayer } from "./components/AudioPlayer";
 
 function App() {
   // ============================================================
@@ -215,11 +216,14 @@ function App() {
           "shadow-[0_2px_4px_rgba(0,0,0,0.55),0_8px_24px_rgba(0,0,0,0.45),0_32px_72px_rgba(0,0,0,0.3)]",
         )}
       >
-        <div className="absolute top-0 left-0 flex items-center w-full h-10 p-2 bg-[#141417] border-b-2 border-[#19191c] ring-1 ring-inset ring-white/5 overflow-hidden z-10">
+        <div className="absolute top-0 left-0 flex justify-between items-center w-full h-10 p-2 bg-[#141417] border-b-2 border-[#19191c] ring-1 ring-inset ring-white/5 overflow-hidden z-10">
+          <div className="flex">
           <img src={logo} alt="logo" className="invert-25 w-8" />
           <h1 className="ml-2 text-[21px] font-semibold italic tracking-wide text-white/25">
             EQ-6
           </h1>
+          </div>
+          <AudioPlayer />
         </div>
         {/* Top row — EQ display area */}
         <div
