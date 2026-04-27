@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import logo from "./assets/AE-LOGO.svg";
+import logo from "/AE-LOGO.svg";
 import { cn } from "./lib/utils/utils";
 import {
   freqToNormalized,
@@ -49,13 +49,14 @@ function App() {
   const [knobDblClicked, setKnobDblClicked] = useState<"FREQ" | "GAIN" | null>(
     null,
   );
+  const [waveformPath, setWaveformPath] = useState<string>("");
 
   // Which band should display labels
-  const labelBandIndex =
+  const labelBandIndex: number =
     hoveredBandIndex !== null ? hoveredBandIndex : selectedBandIndex;
 
   // Grid marker positions
-  const markerPositions = getMarkerPositions(freqMarkers, graphMinX, graphMaxX);
+  const markerPositions: number[] = getMarkerPositions(freqMarkers, graphMinX, graphMaxX);
 
   // Selected band visual values
   const {
@@ -84,7 +85,7 @@ function App() {
     });
 
   // Gain label visibility
-  const showGainLabel =
+  const showGainLabel: boolean =
     isHandleDragging ||
     isGainKnobHovered ||
     (isKnobDragging && activeKnob === "GAIN");
@@ -98,7 +99,7 @@ function App() {
     });
 
   // Frequency label visibility
-  const showFreqLabel =
+  const showFreqLabel: boolean =
     isHandleDragging ||
     isFreqKnobHovered ||
     (isKnobDragging && activeKnob === "FREQ");
@@ -123,8 +124,8 @@ function App() {
   function handleKnobDrag(e: React.MouseEvent<HTMLElement, MouseEvent>): void {
     if (!isKnobDragging) return;
 
-    const currY = e.clientY;
-    const deltaY = currY - lastMouseY;
+    const currY: number = e.clientY;
+    const deltaY: number = currY - lastMouseY;
 
     if (activeKnob === "Q") {
       const sensitivity = 0.1;
@@ -205,7 +206,7 @@ function App() {
       <div
         className={cn(
           "relative",
-          "w-[70%] max-w-200 h-150",
+          "min-w-200 h-150",
           "flex flex-col",
           "rounded-xl",
           // Outer border + inset highlight ring for a layered surface feel
@@ -218,12 +219,12 @@ function App() {
       >
         <div className="absolute top-0 left-0 flex justify-between items-center w-full h-10 p-2 bg-[#141417] border-b-2 border-[#19191c] ring-1 ring-inset ring-white/5 overflow-hidden z-10">
           <div className="flex">
-          <img src={logo} alt="logo" className="invert-25 w-8" />
-          <h1 className="ml-2 text-[21px] font-semibold italic tracking-wide text-white/25">
-            EQ-6
-          </h1>
+            <img src={logo} alt="logo" className="invert-25 w-8" />
+            <h1 className="ml-2 text-[21px] font-semibold italic tracking-wide text-white/25">
+              EQ-6
+            </h1>
           </div>
-          <AudioPlayer />
+          <AudioPlayer bandsArr={bandsArr} setWaveformPath={setWaveformPath} />
         </div>
         {/* Top row — EQ display area */}
         <div
@@ -264,6 +265,14 @@ function App() {
                 />
               );
             })}
+            <path
+              d={waveformPath}
+              fill="rgba(255,255,255,0.06)"
+              stroke="rgba(255,255,255,0.10)"
+              strokeWidth={1}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
 
             {/* EQ band — visual only */}
             {bandsArr.map((band, index) => {
@@ -301,68 +310,6 @@ function App() {
                   gainLabelWidth={gainLabelWidth}
                   gainLabel={gainLabel}
                 />
-                // <svg
-                //   className="absolute inset-0 w-full h-full"
-                //   style={{ pointerEvents: "none" }}
-                //   preserveAspectRatio="none"
-                //   viewBox="0 0 800 480"
-                //   key={index}
-                // >
-                //   <defs>
-                //     {/* Bell fill */}
-                //     <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-                //       <stop
-                //         offset="100%"
-                //         stopColor={band.color}
-                //         stopOpacity="0.34"
-                //       />
-                //     </linearGradient>
-                //     {/* Glow filter for the handle */}
-                //     <filter
-                //       id="handleGlow"
-                //       x="-80%"
-                //       y="-80%"
-                //       width="260%"
-                //       height="260%"
-                //     >
-                //       <feGaussianBlur stdDeviation="4" result="blur" />
-                //       <feMerge>
-                //         <feMergeNode in="blur" />
-                //         <feMergeNode in="SourceGraphic" />
-                //       </feMerge>
-                //     </filter>
-                //   </defs>
-
-                //   {/* Bell curve — fill + stroke wrapped in fade mask */}
-                //   <path
-                //     d={`${bandPath} L 800 ${baselineY} L 0 ${baselineY} Z`}
-                //     fill={`url(#${fillId})`}
-                //     className={
-                //       selectedBandIndex === index ? "opacity-100" : "opacity-40"
-                //     }
-                //   />
-                //   <path
-                //     d={bandPath}
-                //     fill="none"
-                //     stroke={band.color}
-                //     strokeWidth="1.5"
-                //     strokeOpacity="0.85"
-                //   />
-                //   <ValueLabel
-                //     show={showFreqLabel}
-                //     x={freqLabelX}
-                //     y={freqLabelY}
-                //     width={freqLabelWidth}
-                //     text={freqLabel}
-                //   />
-                //   <ValueLabel
-                //     show={showGainLabel}
-                //     x={gainLabelX}
-                //     y={gainLabelY}
-                //     width={gainLabelWidth}
-                //     text={gainLabel}
-                //   />
-                // </svg>
               );
             })}
             {bandsArr.map((band, index) => {
@@ -396,50 +343,6 @@ function App() {
                   }}
                   setIsHandleDragging={setIsHandleDragging}
                 />
-                //
-                // <svg
-                //   className="absolute inset-0 w-full h-full"
-                //   style={{ pointerEvents: "none" }}
-                //   preserveAspectRatio="none"
-                //   viewBox="0 0 800 480"
-                //   key={index}
-                // >
-                //   <g
-                //     style={{
-                //       transformOrigin: `${bandHandleX}px ${bandHandleY}px`,
-                //       transition: "transform 0.15s ease",
-                //       cursor: "pointer",
-                //     }}
-                //     className="group hover:scale-120"
-                //     pointerEvents="all"
-                //     onMouseEnter={() => setHoveredBandIndex(index)}
-                //     onMouseLeave={() => setHoveredBandIndex(null)}
-                //     onMouseDown={(e) => {
-                //       e.stopPropagation();
-                //       setSelectedBandIndex(index);
-                //       setIsHandleDragging(true);
-                //     }}
-                //     onMouseUp={(e) => {
-                //       e.stopPropagation();
-                //       setIsHandleDragging(false);
-                //     }}
-                //   >
-                //     <circle
-                //       cx={bandHandleX}
-                //       cy={bandHandleY}
-                //       r="6"
-                //       fill={band.color}
-                //       filter="url(#handleGlow)"
-                //     />
-                //     {/* Inner bright dot */}
-                //     <circle
-                //       cx={bandHandleX}
-                //       cy={bandHandleY}
-                //       r="3"
-                //       fill={band.color}
-                //     />
-                //   </g>
-                // </svg>
               );
             })}
           </svg>

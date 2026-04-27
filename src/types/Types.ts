@@ -51,3 +51,7 @@ export type Track = {
   fileName: string;
   name: string;
 }
+
+export type AudioPlayerProps = {
+  setWaveformPath: React.Dispatch<React.SetStateAction<string>>;
+};
