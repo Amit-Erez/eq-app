@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import logo from "/AE-LOGO.svg";
 import { cn } from "./lib/utils/utils";
 import {
@@ -190,6 +190,21 @@ function App() {
     const clampedGainValue = Math.max(minGain, Math.min(maxGain, newGainValue));
     updateBands("gainValue", clampedGainValue);
   }
+
+  // preventing knob-drag state from getting stuck on mouseup outside the window
+  useEffect(() => {
+  function handleWindowMouseUp() {
+    setIsKnobDragging(false);
+    setIsHandleDragging(false);
+    setActiveKnob(null);
+  }
+
+  window.addEventListener("mouseup", handleWindowMouseUp);
+
+  return () => {
+    window.removeEventListener("mouseup", handleWindowMouseUp);
+  };
+}, []);
 
   return (
     <div
